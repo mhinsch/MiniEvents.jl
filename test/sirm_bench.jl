@@ -121,7 +121,9 @@ function setup_sim(;xs, ys, seed)
 	SI.reset!()
 	spawn(sim)
 
-	SI.upto!(10000.0)
+	for i in 1:3000000
+		SI.next!()
+	end
 
     sim
 end
@@ -139,7 +141,7 @@ function run_bench()
 	i = 1
 	for grid_size in [2, 4, 8, 16, 32, 64, 128, 256, 512]
 		println("grid size: ", grid_size)
-		@btime run_sim(1000) setup = (setup_sim(xs=$grid_size, ys=$grid_size, seed=$i))
+		@btime run_sim(500000) setup = (setup_sim(xs=$grid_size, ys=$grid_size, seed=$i))
 		i += 1
 	end
 end

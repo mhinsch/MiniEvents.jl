@@ -268,6 +268,7 @@ macro processes(model_name, sim, agent_decl, decl)
 	Expr(:toplevel, mod, pois_func, spawn_func)
 end
 
+# TODO isn't a different type required?
 "Add additional processes (potentially with different agent types) to an existing scheduling module.
 For details see the documentation of `@processes`."
 macro add_processes(model_name, sim, agent_decl, decl)
