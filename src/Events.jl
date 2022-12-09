@@ -1,19 +1,31 @@
-struct AgentActions{AT, V}
+module Events
+
+export AgentEvents, EventList, lookup, change_rates!, add_agent!, remove_agent!
+
+"Single agent and the rates of all actions it can do."
+struct AgentEvents{AT, V}
 	agent :: AT
-	probs :: V
-	self_sum :: Float64
+	rates :: V
 end
 
-
-mutable struct ActionList{AT, V}
+"All actions currently available to all agents of type `AT`."
+mutable struct EventList{AT, V}
+	"Map agent references to indices in the action vector."	
 	indices :: Dict{AT, Int}
+	"Sums of rates of subtrees."
 	sums :: Vector{Float64}
-	actions :: Vector{AgentActions{AT, V}}
+	"All agents and their respective events."
+	events :: Vector{AgentEvents{AT, V}}
+	"Changes since last rate recalculation."
 	count :: Int
 end
 
-sum_rates(a::AgentActions{AT, V}) where {AT, V} = a.self_sum #a.probs[end]
-sum_rates(al::ActionList{AT,V}) where {AT, V} = isempty(al.sums) ? 0.0 : al.sums[1]
+function EventList{AT, V}() where {AT, V}
+	EventList{AT, V}(Dict{AT, Int}(), Float64[], [], 0)
+end
+
+sum_rates(a::AgentEvents{AT, V}) where {AT, V} = sum(a.rates)
+sum_rates(al::EventList{AT,V}) where {AT, V} = isempty(al.sums) ? 0.0 : al.sums[1]
 
 
 left(idx) = 2*idx
@@ -68,12 +80,11 @@ function lookup(sums, prob, idx)
 	lookup(sums, prob - sum_all + sum_right, r)
 end
 
-function change_rates!(agent::T, alist::ActionList{T, V}, rates::V) where {T,V}
+function change_rates!(agent::T, alist::EventList{T, V}, rates::V) where {T,V}
 	idx = alist.indices[agent]
-	new_self_sum = sum(rates)
 	# change in rate
-	delta = new_self_sum - alist.actions[idx].self_sum 
-	alist.actions[idx] = AgentActions(agent, rates, new_self_sum)
+	delta = sum(rates) - sum_rates(alist.events[idx])
+	alist.events[idx] = AgentEvents(agent, rates)
 	
 	if delta == 0
 		return
@@ -97,13 +108,13 @@ function add_delta!(sums, idx, delta)
 	add_delta!(sums, parent(idx), delta)
 end
 
-function add_agent!(agent::T, alist::ActionList{T, V}, rates::V) where {T,V}
-	new_self_sum = sum(rates)
-	push!(alist.actions, AgentActions(agent, rates, new_self_sum))
-	push!(alist.sums, new_self_sum)
-	alist.indices[agent] = length(alist.actions)
+function add_agent!(agent::T, alist::EventList{T, V}, rates::V) where {T,V}
+	new_sum = sum(rates)
+	push!(alist.events, AgentEvents(agent, rates))
+	push!(alist.sums, new_sum)
+	alist.indices[agent] = length(alist.events)
 
-	if new_self_sum == 0 || length(alist.actions) == 1
+	if new_sum == 0 || length(alist.events) == 1
 		return
 	end
 
@@ -111,7 +122,7 @@ function add_agent!(agent::T, alist::ActionList{T, V}, rates::V) where {T,V}
 		recalculate!(alist)
 		alist.count = 0
 	else
-		add_delta!(alist.sums, parent(length(alist.sums)), new_self_sum)
+		add_delta!(alist.sums, parent(length(alist.sums)), new_sum)
 	end
 end
 
@@ -119,14 +130,14 @@ end
 function remove_agent!(agent, alist)
 	idx = alist.indices[agent]
 
-	removed = alist.actions[idx]
-	rmv_sum = removed.self_sum
+	removed = alist.events[idx]
+	rmv_sum = sum_rates(removed)
 
-	moved = alist.actions[end]
-	mv_sum = moved.self_sum
+	moved = alist.events[end]
+	mv_sum = sum_rates(moved)
 
-	alist.actions[idx] = moved
-	pop!(alist.actions)
+	alist.events[idx] = moved
+	pop!(alist.events)
 
 	alist.indices[moved.agent] = idx
 	pop!(alist.indices, removed.agent)
@@ -153,6 +164,7 @@ function recalculate!(alist, idx)
 		recalculate!(alist, right(idx)) : 0.0
 
 	
-	alist.sums[idx] = sum_left + sum_right + sum_rates(alist.actions[idx])
+	alist.sums[idx] = sum_left + sum_right + sum_rates(alist.events[idx])
 end
 
+end # module Events

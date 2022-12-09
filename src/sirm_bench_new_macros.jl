@@ -30,7 +30,6 @@ mutable struct Simulation{ALT}
 	alists :: ALT
 end
 
-@model SIRM begin
 
 @processes world::World begin
 	@poisson(0.0001) ~
@@ -57,7 +56,7 @@ end
             begin
                 # status changes
                 person.status = infected
-                [person; person.contacts]
+                @r person person.contacts
             end
 
 	@poisson(1e-2) ~
@@ -83,7 +82,10 @@ end
 			end
 	end
 
-end # model SIRM
+# this should be fine I think. The only situation where we need *global*
+# information is for the global step function and possibly the type that
+# holds all action lists, but those need only the list of types.
+@model SIRM World Person
 
 
 function setup_grid(constr, xs, ys)
