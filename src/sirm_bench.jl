@@ -24,37 +24,36 @@ Person() = Person(susceptible, [])
 Person(state) = Person(state, [])
 
 
-@processes world::World begin true end begin 0.00001 end begin world.x = 1 end
-	
+@events world::World begin
+	@rate(0.00001) ~ true => (world.x = 1)
+end
 
-@processes person::Person begin
-    person.status == susceptible
-    person.status == infected
-    person.status == recovered
-end begin
-    count(p -> p.status == infected, person.contacts) + 1e-6
-    1e-2
-    1e-4
-end begin
-    begin
-		person.status = infected
+@events person::Person begin
+    @rate(count(p -> p.status == infected, person.contacts) + 1e-6) ~
+	    person.status == susceptible =>
+ 	    begin
+			person.status = infected
 
-		refresh!(person)
-		refresh!(person.contacts)
-	end
-	
-    begin
-		person.status = recovered
+			refresh!(person)
+			refresh!(person.contacts)
+		end
 
-		refresh!(person)
-		refresh!(person.contacts)
-	end
+    @rate(1e-2) ~
+	    person.status == infected =>
+	    begin
+			person.status = recovered
 
-    begin
-		person.status = susceptible
+			refresh!(person)
+			refresh!(person.contacts)
+		end
 
-		refresh!(person)
-    end
+    @rate(1e-4) ~
+	    person.status == recovered =>
+	    begin
+			person.status = susceptible
+
+			refresh!(person)
+	    end
 end
 
 @simulation Sim Person World

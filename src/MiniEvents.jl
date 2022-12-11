@@ -117,19 +117,37 @@ function gen_step_fn(decl, actions)
 end
 
 
-macro processes(decl, conds, rates, actions)
+function events(decl_agent, block, decl_world=nothing)
+	block = rmlines(block)
+	rates = []
+	conds = []
+	actions = []
+	for line in block.args
+		if !@capture(line, @rate(expr_rate_) ~ expr_cond_ => expr_act_)
+			error("Event declarations expected: @event(<RATE>) ~ <COND> => <ACTION>")	
+		end
+		push!(rates, expr_rate)
+		push!(conds, expr_cond)
+		push!(actions, expr_act)
+	end
+	
+	generate(decl_agent, conds, rates, actions)
+end
+
+
+function generate(decl, conds, rates, actions)
     res = quote end
 
-    fd = gen_event_count_fn(decl, length(rmlines(conds).args))
+    fd = gen_event_count_fn(decl, length(conds))
     push!(res.args, fd)
 
     fd = gen_refresh_fn(decl)
     push!(res.args, fd)
 
-    fd = gen_calc_rate_fn(decl, rmlines(conds).args, rmlines(rates).args)
+    fd = gen_calc_rate_fn(decl, conds, rates)
     push!(res.args, fd)
 
-    fd = gen_step_fn(decl, rmlines(actions).args)
+    fd = gen_step_fn(decl, actions)
     push!(res.args, fd)
 
     res
@@ -171,3 +189,15 @@ macro simulation(name, types...)
         $aa_block
     end
 end
+
+
+macro events(decl_agent, block)
+	events(decl_agent, block)
+end
+
+
+macro events(decl_agent, decl_world, block)
+	events(decl_agent, block, decl_world)
+end
+
+
