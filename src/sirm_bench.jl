@@ -34,8 +34,7 @@ end
  	    begin
 			person.status = infected
 
-			refresh!(person)
-			refresh!(person.contacts)
+			@r person person.contacts
 		end
 
     @rate(1e-2) ~
@@ -43,8 +42,7 @@ end
 	    begin
 			person.status = recovered
 
-			refresh!(person)
-			refresh!(person.contacts)
+			@r person person.contacts
 		end
 
     @rate(1e-4) ~
@@ -52,7 +50,7 @@ end
 	    begin
 			person.status = susceptible
 
-			refresh!(person)
+			@r person
 	    end
 end
 

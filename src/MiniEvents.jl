@@ -135,6 +135,22 @@ function events(decl_agent, block, decl_world=nothing)
 end
 
 
+function filter_refreshs!(actions)
+	for (i, a) in enumerate(actions)
+		actions[i] = MacroTools.postwalk(a) do x
+			if @capture(x, @r(args__))
+				ret = quote end
+				ret.args = [:(refresh!($arg)) for arg in args]
+				ret
+			else
+				x
+			end
+		end
+	end
+	nothing	
+end
+
+
 function generate(decl, conds, rates, actions)
     res = quote end
 
@@ -146,6 +162,8 @@ function generate(decl, conds, rates, actions)
 
     fd = gen_calc_rate_fn(decl, conds, rates)
     push!(res.args, fd)
+
+	filter_refreshs!(actions)
 
     fd = gen_step_fn(decl, actions)
     push!(res.args, fd)
