@@ -7,18 +7,18 @@ using DataStructures
 
 
 "A simple scheduler based on PriorityQueue."
-mutable struct PQScheduler{TIME}
-	queue :: PriorityQueue{Any, TIME}
-	actions :: Dict{Any, Function}
+mutable struct PQScheduler{TIME, OBJ}
+	queue :: PriorityQueue{OBJ, TIME}
+	actions :: Dict{OBJ, Function}
 	now :: TIME
 end
 
 "Construct an empty PQScheduler with a give TIME type."
-PQScheduler{TIME}() where {TIME} = PQScheduler{TIME}(
-	PriorityQueue{Any, TIME}(), Dict{Any, Function}(), TIME(0))
+PQScheduler{TIME, OBJ}() where {TIME, OBJ} = PQScheduler{TIME, OBJ}(
+	PriorityQueue{OBJ, TIME}(), Dict{OBJ, Function}(), TIME(0))
 
 "Returns true if the scheduler does not contain any actions."
-Base.isempty(scheduler::PQScheduler{TIME}) where {TIME} = isempty(scheduler.queue)
+Base.isempty(scheduler::PQScheduler) = isempty(scheduler.queue)
 
 "Add a single item to the scheduler. Adds function `fun` to be called on `obj` at time `at` to `scheduler`."
 function schedule!(fun, obj, at, scheduler)
@@ -33,6 +33,10 @@ time_now(scheduler) = scheduler.now
 "Time stamp of the next action to be executed by `scheduler` or `time_now` if it is empty."
 time_next(scheduler) = isempty(scheduler) ? scheduler.now : peek(scheduler.queue)[2]
 
+"Advance time to `t`. Caution, this does not check for consistency!"
+function advance!(scheduler, t)
+	scheduler.now = t
+end
 
 "Add a single item (`fun` to be called on `obj`) at `wait` time from now to `scheduler`."
 function schedule_in!(fun, obj, wait, scheduler)
@@ -83,7 +87,7 @@ function upto!(scheduler, atime)
 end
 
 "Remove action for `obj` from `scheduler`."
-function unschedule!(scheduler, obj::Any)
+function unschedule!(scheduler, obj)
 	delete!(scheduler.queue, obj)
 	delete!(scheduler.actions, obj)
 end

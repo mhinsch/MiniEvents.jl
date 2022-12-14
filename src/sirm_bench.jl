@@ -1,6 +1,7 @@
 using Random
 using BenchmarkTools
 using StaticArrays
+using Distributions
 
 include("MiniEvents.jl")
 
