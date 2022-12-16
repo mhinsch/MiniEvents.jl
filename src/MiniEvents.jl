@@ -1,4 +1,5 @@
 using MacroTools
+using StaticArrays 
 
 
 include("Events.jl")
@@ -14,7 +15,21 @@ function refresh!(agents, alist)
 	end
 end
 
+"Forward schedule to the scheduler belonging to `obj`'s type."
+function Scheduler.schedule!(fun, obj, at, sim)
+	schedule!(fun, obj, at, get_scheduler(sim, typeof(obj)))
+end
 
+
+sched_mem_name(i) = Symbol("sched_$i")
+alist_mem_name(i) = Symbol("alist_$i")
+sum_name(i) = Symbol("sum_$i")
+const VecType = SVector
+
+
+# *** generators for agent type specific helper functions
+
+"Generates `event_count(type)` for given type."
 function gen_event_count_fn(decl, n)
     ag_type = decl.args[2]
     quote
@@ -24,7 +39,7 @@ function gen_event_count_fn(decl, n)
     end
 end
 
-
+"Generates `refresh!(agent, alist)` for given type."
 function gen_refresh_fn(decl)
     ag_type = decl.args[2]
     quote
@@ -34,10 +49,16 @@ function gen_refresh_fn(decl)
     end
 end
 
+"Generates `get_scheduler(sim, type)` for given type."
+function gen_get_scheduler_fn(ag_type, n)
+	sched_name = sched_mem_name(n)
+	:($(esc(:get_scheduler))(sim, ::Type{$ag_type}) = sim.$sched_name)
+end
+
 
 function gen_calc_rate_fn(decl, conds, rates)
     n = length(conds)
-    VT = :(SVector{$n, Float64})
+    VT = :(VecType{$n, Float64})
 
     con_call = :($VT())
     for (c, r) in zip(conds, rates)
@@ -50,6 +71,37 @@ function gen_calc_rate_fn(decl, conds, rates)
             $con_call
         end
     end
+end
+
+
+"Generate the initial scheduling to be done by `add_agent`."
+function gen_scheduled_action_fn(decl, interval, start, action)
+    ag_name = decl.args[1]
+    ag_type = decl.args[2]
+
+	fun_name = :($(esc(:scheduled_action!)))
+
+	repeat = if interval != nothing
+			:($fun_name($(esc(ag_name)), sim, $interval))
+		else
+			:()
+		end
+
+	fn_body = isempty(action.args) ?
+		:() : # return noop function if no actions are provided
+		quote 
+			schedule_in!($ag_name, dt, get_scheduler(sim, $ag_type)) do $(esc(decl)) 
+				$(esc(action))
+				$repeat
+			end
+		end	
+
+	quote
+		# first interation starts at $start
+		function $fun_name($decl, sim, dt=$start)
+			$fn_body
+		end
+	end
 end
 
 
@@ -68,7 +120,7 @@ function filter_refreshs(actions, r_arg)
 	end
 end
 
-
+"Generate `step(alist)` for a single type, including all actions."
 function gen_step_fn(decl, actions)
     check_actions = quote end
 
@@ -81,7 +133,7 @@ function gen_step_fn(decl, actions)
         push!(check_actions.args, check)
     end
 
-    l_type = :(SVector{$(length(actions)), Float64})
+    l_type = :(VecType{$(length(actions)), Float64})
     ag_name = decl.args[1]
     ag_type = decl.args[2]
 
@@ -101,28 +153,48 @@ function gen_step_fn(decl, actions)
 end
 
 
-function events(decl_agent, block, decl_world=nothing)
+function parse_events(decl_agent, block, decl_world=nothing)
 	block = rmlines(block)
 	rates = []
 	conds = []
 	actions = []
+
+	# default values that will do nothing
+	expr_start = :(0)
+	expr_interval = nothing
+	expr_action = :()
+	sched_exprs = expr_interval, expr_start, expr_action
+	has_sched = false
+
 	for line in block.args
 		if @capture(line, @rate(expr_rate_) ~ expr_cond_ => expr_act_)
 			push!(rates, expr_rate)
 			push!(conds, expr_cond)
 			push!(actions, expr_act)
-		elseif @capture(line, @repeat(expr_interv_, expr_start_) => expr_act_)
-		elseif @capture(line, @at(expr_time_) => expr_act_)
+		# these are for convenience only, more sophisticated scenarios have to be done
+		# manually using schedule!
+		elseif @capture(line, @repeat(expr_interval_, expr_start_) => expr_action_)
+			if has_sched
+				error("only one schedule per type allowed")
+			end
+			sched_exprs = expr_interval, expr_start, expr_action
+			has_sched = true
+		elseif @capture(line, @at(expr_start_) => expr_action_)
+			if has_sched
+				error("only one schedule per type allowed")
+			end
+			sched_exprs = expr_interval, expr_start, expr_action
+			has_sched = true
 		else
 			error("Event declarations expected: @event(<RATE>) ~ <COND> => <ACTION>")	
 		end
 	end
 	
-	generate(decl_agent, conds, rates, actions)
+	generate_events_code(decl_agent, conds, rates, actions, sched_exprs)
 end
 
 
-function generate(decl, conds, rates, actions)
+function generate_events_code(decl, conds, rates, actions, sched_exprs)
     res = quote end
 
     fd = gen_event_count_fn(decl, length(conds))
@@ -137,7 +209,10 @@ function generate(decl, conds, rates, actions)
     fd = gen_step_fn(decl, actions)
     push!(res.args, fd)
 
-    res
+	fd = gen_scheduled_action_fn(decl, sched_exprs...)
+    push!(res.args, fd)
+    
+	res
 end
 
 
@@ -202,14 +277,14 @@ function gen_time_or_rates_fn(n_alists, n_schedulers)
 	cs_args = []
 	
 	for i in 1:n_alists
-		sname = Symbol("sum_$i")
-		al_name = Symbol("alist_$i")
+		sname = sum_name(i)
+		al_name = alist_mem_name(i)
 		push!(cs_args, :($sname = Events.sum_rates(sim.$al_name)))
 	end
 
 	sum_exp = Expr(:call, :+)
 	for i in 1:n_alists
-		sname = Symbol("sum_$i")
+		sname = sum_name(i)
 		push!(sum_exp.args, sname)
 	end
 	
@@ -221,10 +296,10 @@ function gen_time_or_rates_fn(n_alists, n_schedulers)
 	calc_sums_and_draw_wtime = Expr(:block, cs_args...)
 
 # *** check scheduled events
-	next_dt_call = :(next_in_dtime!(dtime, sim))
+	next_dt_call = :(next_in_dtime!(sim.dtime, sim))
 	ndc_args = next_dt_call.args
 	for i in 1:n_schedulers
-		sname = Symbol("sched_$i")
+		sname = sched_mem_name(i)
 		push!(ndc_args, :(sim.$sname))
 	end
 	
@@ -232,7 +307,7 @@ function gen_time_or_rates_fn(n_alists, n_schedulers)
 			# check if next scheduled event is earlier than waiting time
 			# if so execute it
 			elapsed = $next_dt_call
-			sim.dtime = dtime - elapsed
+			sim.dtime -= elapsed
 			# we are still not at waiting time, so do nothing
 			if sim.dtime > 0
 				return
@@ -248,8 +323,8 @@ function gen_time_or_rates_fn(n_alists, n_schedulers)
 
 	# select alist accordingly and execute 
 	for i in 1:n_alists
-		sname = Symbol("sum_$i")
-		al_name = Symbol("alist_$i")
+		sname = sum_name(i)
+		al_name = alist_mem_name(i)
 		push!(sal_args, 
 			quote
 				if r <= $sname
@@ -277,11 +352,13 @@ end
 
 macro simulation(name, types...)
 	# struct declaration and members
-    decl = :(struct $name end)
+    decl = :(mutable struct $name 
+		dtime :: Float64
+		end)
     members = decl.args[3].args
 	
 	# constructor and arguments
-    constr = :($(esc(name))())
+    constr = :($(esc(name))(0.0))
 	args = constr.args
 
 	# add_agent and arguments
@@ -290,35 +367,45 @@ macro simulation(name, types...)
 
 	# generate alist members for rate-based scheduling
     for (i, t) in enumerate(types)
-        al_name = Symbol("alist_$i")
-        al_type = :(EventList{$t, SVector{event_count($t), Float64}})
+        al_name = alist_mem_name(i)
+        al_type = :(EventList{$t, VecType{event_count($t), Float64}})
         al_e = :($al_name :: $al_type)
-        al_aa = :(Events.add_agent!(a :: $t, s :: $name) = 
-                 Events.add_agent!(a, s.$al_name, calc_rates(a)))
+        al_aa = quote 
+				function $(esc(:spawn!))(a :: $t, s :: $name) 
+					scheduled_action!(a, s)
+	                Events.add_agent!(a, s.$al_name, calc_rates(a))
+				end
+			end
 
         push!(members, al_e)
         push!(args, :($al_type()))
         push!(add_a_args, al_aa)
     end
 
+	getsch_fns = []
+
 	# generate scheduler members for time-based scheduling
 	for (i, t) in enumerate(types)
-		sched_name = Symbol("sched_$i")
+		sched_name = sched_mem_name(i)
 		sched_type = :(PQScheduler{Float64, $t})
 		
 		sched_e = :($sched_name :: $sched_type)
-		# TODO add_agent
 
 		push!(members, sched_e)
 		push!(args, :($sched_type()))
-		# TODO add_a_args
+
+		getsch_fn = gen_get_scheduler_fn(t, i)
+		push!(getsch_fns, getsch_fn) 
 	end
 
 	time_rates_fn = gen_time_or_rates_fn(length(types), length(types))
 
+
     quote
         $decl
         $(esc(name))() = $constr
+
+		$(getsch_fns...)
 
 		$(time_rates_fn)
 
@@ -330,12 +417,12 @@ end
 
 
 macro events(decl_agent, block)
-	events(decl_agent, block)
+	parse_events(decl_agent, block)
 end
 
 
 macro events(decl_agent, decl_world, block)
-	events(decl_agent, block, decl_world)
+	parse_events(decl_agent, block, decl_world)
 end
 
 

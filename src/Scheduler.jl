@@ -17,6 +17,8 @@ end
 PQScheduler{TIME, OBJ}() where {TIME, OBJ} = PQScheduler{TIME, OBJ}(
 	PriorityQueue{OBJ, TIME}(), Dict{OBJ, Function}(), TIME(0))
 
+time_type(sched::PQScheduler{TIME, OBJ}) where {TIME, OBJ} = TIME
+
 "Returns true if the scheduler does not contain any actions."
 Base.isempty(scheduler::PQScheduler) = isempty(scheduler.queue)
 
@@ -31,7 +33,7 @@ end
 time_now(scheduler) = scheduler.now
 
 "Time stamp of the next action to be executed by `scheduler` or `time_now` if it is empty."
-time_next(scheduler) = isempty(scheduler) ? scheduler.now : peek(scheduler.queue)[2]
+time_next(scheduler) = isempty(scheduler) ? time_type(scheduler)(Inf) : peek(scheduler.queue)[2]
 
 "Advance time to `t`. Caution, this does not check for consistency!"
 function advance!(scheduler, t)
