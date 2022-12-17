@@ -65,7 +65,7 @@ mutable struct Simulation
 end
 
 function step(sim)
-	step(sim.sim)
+	step!(sim.sim)
 end
 
 

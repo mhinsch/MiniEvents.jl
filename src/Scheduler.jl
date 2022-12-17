@@ -1,6 +1,6 @@
 module Scheduler
 
-export PQScheduler, isempty, schedule!, time_now, time_next, schedule_in!, next!, upto!, unschedule!, reset!
+export PQScheduler, isempty, schedule!, time_now, time_next, schedule_in!, next!, upto!, unschedule!, reset!, advance!
 
 
 using DataStructures

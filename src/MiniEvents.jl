@@ -1,5 +1,6 @@
 using MacroTools
 using StaticArrays 
+using Distributions
 
 
 include("Events.jl")
@@ -13,11 +14,6 @@ function refresh!(agents, alist)
 	for agent in agents
 		change_rates!(agent, alist, calc_rates(agent))
 	end
-end
-
-"Forward schedule to the scheduler belonging to `obj`'s type."
-function Scheduler.schedule!(fun, obj, at, sim)
-	schedule!(fun, obj, at, get_scheduler(sim, typeof(obj)))
 end
 
 
@@ -48,6 +44,13 @@ function gen_refresh_fn(decl)
         end
     end
 end
+
+"Generates `get_alist(sim, type)` for given type."
+function gen_get_alist_fn(ag_type, n)
+	alist_name = alist_mem_name(n)
+	:($(esc(:get_alist))(sim, ::Type{$ag_type}) = sim.$alist_name)
+end
+
 
 "Generates `get_scheduler(sim, type)` for given type."
 function gen_get_scheduler_fn(ag_type, n)
@@ -105,6 +108,7 @@ function gen_scheduled_action_fn(decl, interval, start, action)
 end
 
 
+"Replace @r with calls to refresh."
 function filter_refreshs(actions, r_arg)
 	MacroTools.postwalk(actions) do x
 		if @capture(x, @r(args__))
@@ -120,7 +124,7 @@ function filter_refreshs(actions, r_arg)
 	end
 end
 
-"Generate `step(alist)` for a single type, including all actions."
+"Generate `step!(alist)` for a single type, including all actions."
 function gen_step_fn(decl, actions)
     check_actions = quote end
 
@@ -138,7 +142,7 @@ function gen_step_fn(decl, actions)
     ag_type = decl.args[2]
 
     quote
-        function $(esc(:step))($(esc(:alist)) :: $(esc(:EventList)){$ag_type, $l_type}, rnum)
+        function $(esc(:step!))($(esc(:alist)) :: $(esc(:EventList)){$ag_type, $l_type}, rnum)
             i, r = lookup(alist.sums, rnum)
 
             ag_actions = alist.events[i]
@@ -216,7 +220,7 @@ function generate_events_code(decl, conds, rates, actions, sched_exprs)
 end
 
 
-function gen_next_in_dtime!(dtime, sim, schedulers...)
+function gen_next_in_dtime!(t_next_evt , sim, schedulers...)
 	t_expr = quote end
 	t_args = t_expr.args	
 	
@@ -246,34 +250,32 @@ function gen_next_in_dtime!(dtime, sim, schedulers...)
 			end)
 	end
 
+	# if check_next is sooner than the next scheduled event
+	# we simply advance all schedulers
+	push!(min_args, :(t_next_evt))
+
 	quote
 		# current time
 		now = time_now(schedulers[1])
-		# time of next rate event	
-		check_next = now + dtime
 		
 		# get scheduled times of all schedulers
 		$t_expr
 		
 		# soonest scheduled event
 		min_next = $min_expr
-		# next schedule event is after next rate event, nothing more to do
-		if min_next > check_next
-			return dtime
-		end
 
 		# handle next scheduled event
 		$step_min
-		return min_next - now
-	end 
+		return min_next
+	end |> MacroTools.flatten
 end
 
-@generated function next_in_dtime!(dtime, sim, schedulers...)
-	gen_next_in_dtime!(dtime, sim, schedulers...)
+@generated function next_in_dtime!(t_next_evt , sim, schedulers...)
+	gen_next_in_dtime!(t_next_evt , sim, schedulers...)
 end
 
-function gen_time_or_rates_fn(n_alists, n_schedulers)
-# *** sum of rates and waiting time
+
+function gen_calc_sum_rates(n_alists)
 	cs_args = []
 	
 	for i in 1:n_alists
@@ -282,38 +284,38 @@ function gen_time_or_rates_fn(n_alists, n_schedulers)
 		push!(cs_args, :($sname = Events.sum_rates(sim.$al_name)))
 	end
 
-	sum_exp = Expr(:call, :+)
-	for i in 1:n_alists
-		sname = sum_name(i)
-		push!(sum_exp.args, sname)
+	if n_alists > 1
+		sum_exp = Expr(:call, :+)
+		for i in 1:n_alists
+			sname = sum_name(i)
+			push!(sum_exp.args, sname)
+		end
+	else
+		sum_exp = sum_name(1)
 	end
-	
+
 	push!(cs_args, :(sum = $sum_exp))
+	Expr(:block, cs_args...)
+end
 
+
+function gen_time_or_rates_fn(n_alists, n_schedulers)
+# *** sum of rates and waiting time
+	
 	# draw waiting time
-	push!(cs_args, :(sim.dtime = rand(Exponential(1.0/sum))))
-
-	calc_sums_and_draw_wtime = Expr(:block, cs_args...)
+	draw_wait_time =  quote
+			sim.t_next_evt  = now(sim) + rand(Exponential(1.0/sum))
+			#println(sim.t_next_evt)
+		end 
 
 # *** check scheduled events
-	next_dt_call = :(next_in_dtime!(sim.dtime, sim))
+	next_dt_call = :(next_in_dtime!(sim.t_next_evt , sim))
 	ndc_args = next_dt_call.args
 	for i in 1:n_schedulers
 		sname = sched_mem_name(i)
 		push!(ndc_args, :(sim.$sname))
 	end
 	
-	check_scheduled_events = quote
-			# check if next scheduled event is earlier than waiting time
-			# if so execute it
-			elapsed = $next_dt_call
-			sim.dtime -= elapsed
-			# we are still not at waiting time, so do nothing
-			if sim.dtime > 0
-				return
-			end
-		end
-
 # *** select alist
 	# this part happens only if we have reached waiting time
 	sal_args = []
@@ -328,7 +330,7 @@ function gen_time_or_rates_fn(n_alists, n_schedulers)
 		push!(sal_args, 
 			quote
 				if r <= $sname
-					return step(sim.$al_name, r)
+					return step!(sim.$al_name, r)
 				end
 				r -= $sname
 			end)
@@ -340,11 +342,25 @@ function gen_time_or_rates_fn(n_alists, n_schedulers)
 # *** put everything together
 	quote 
 		function $(esc(:dispatch_time_or_rates))(sim) 		
-			if sim.dtime <= 0
-				$calc_sums_and_draw_wtime
+			# calc sum of rates
+			$(gen_calc_sum_rates(n_alists))
+			# rate event has been triggered or rates been changes
+			if sim.t_next_evt <= now(sim)
+				$draw_wait_time
 			end
-			$check_scheduled_events
+			# check if next scheduled event is earlier than waiting time
+			# if so execute it
+			$next_dt_call
+			# we are still not at waiting time, so 
+			# a scheduled event must have fired, do nothing
+			if sim.t_next_evt > now(sim)
+				print("$(sim.t_next_evt) ")
+				return nothing
+			end
+			# execute rate event
 			$select_alist
+			
+			nothing
 		end
 	end |> MacroTools.flatten
 end
@@ -353,7 +369,7 @@ end
 macro simulation(name, types...)
 	# struct declaration and members
     decl = :(mutable struct $name 
-		dtime :: Float64
+		t_next_evt  :: Float64
 		end)
     members = decl.args[3].args
 	
@@ -361,28 +377,21 @@ macro simulation(name, types...)
     constr = :($(esc(name))(0.0))
 	args = constr.args
 
-	# add_agent and arguments
-    add_a_block = quote end
-    add_a_args = add_a_block.args
+	get_alist_fns = []
 
 	# generate alist members for rate-based scheduling
     for (i, t) in enumerate(types)
         al_name = alist_mem_name(i)
         al_type = :(EventList{$t, VecType{event_count($t), Float64}})
         al_e = :($al_name :: $al_type)
-        al_aa = quote 
-				function $(esc(:spawn!))(a :: $t, s :: $name) 
-					scheduled_action!(a, s)
-	                Events.add_agent!(a, s.$al_name, calc_rates(a))
-				end
-			end
-
         push!(members, al_e)
         push!(args, :($al_type()))
-        push!(add_a_args, al_aa)
+
+		get_alist_fn = gen_get_alist_fn(t, i)
+		push!(get_alist_fns, get_alist_fn) 
     end
 
-	getsch_fns = []
+	get_sched_fns = []
 
 	# generate scheduler members for time-based scheduling
 	for (i, t) in enumerate(types)
@@ -394,27 +403,55 @@ macro simulation(name, types...)
 		push!(members, sched_e)
 		push!(args, :($sched_type()))
 
-		getsch_fn = gen_get_scheduler_fn(t, i)
-		push!(getsch_fns, getsch_fn) 
+		get_sched_fn = gen_get_scheduler_fn(t, i)
+		push!(get_sched_fns, get_sched_fn) 
 	end
 
 	time_rates_fn = gen_time_or_rates_fn(length(types), length(types))
 
+	sched_fn = :(Scheduler.schedule!(fun, obj, at, sim::$name) =
+		schedule!(fun, obj, at, get_scheduler(sim, typeof(obj))))
 
     quote
         $decl
         $(esc(name))() = $constr
 
-		$(getsch_fns...)
+		$(esc(:num_agent_types))(::Type{$name}) = $(length(types))
 
-		$(time_rates_fn)
+		$(get_alist_fns...)
+		$(get_sched_fns...)
 
-        $(esc(:step))(sim :: $name) = dispatch_time_or_rates(sim)
+		$sched_fn
 
-        $add_a_block
+		$time_rates_fn
+
+        $(esc(:step!))(sim :: $name) = dispatch_time_or_rates(sim)
     end
 end
 
+@generated now(sim) = :(time_now(sim.$(sched_mem_name(1))))
+
+"Reset waiting time."
+function refresh_simulation!(sim)
+	sim.t_next_evt  = now(sim)
+end
+
+
+function spawn!(a, s) 
+	scheduled_action!(a, s)
+    Events.add_agent!(a, get_alist(s, typeof(a)), calc_rates(a))
+	# rates have changed => redraw waiting time
+	refresh_simulation!(s)
+end
+
+function spawn_pop!(agents, s) 
+	for a in agents
+		scheduled_action!(a, s)
+	    Events.add_agent!(a, get_alist(s, typeof(a)), calc_rates(a))
+	end
+	# rates have changed => redraw waiting time
+	refresh_simulation!(s)
+end
 
 macro events(decl_agent, block)
 	parse_events(decl_agent, block)
