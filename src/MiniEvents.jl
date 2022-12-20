@@ -8,8 +8,8 @@ using Reexport
 export @events, @simulation, refresh!, schedule!, spawn!
 
 
-include("Events.jl")
-@reexport using .Events
+include("EventLists.jl")
+@reexport using .EventLists
 
 include("Scheduler.jl")
 @reexport using .Scheduler
@@ -298,7 +298,7 @@ function gen_calc_sum_rates(n_alists)
 	for i in 1:n_alists
 		sname = sum_name(i)
 		al_name = alist_mem_name(i)
-		push!(cs_args, :($sname = Events.sum_rates(sim.$al_name)))
+		push!(cs_args, :($sname = EventLists.sum_rates(sim.$al_name)))
 	end
 
 	if n_alists > 1
@@ -459,7 +459,7 @@ end
 
 function spawn!(a, s) 
 	scheduled_action!(a, s)
-    Events.add_agent!(a, get_alist(s, typeof(a)), calc_rates(a))
+    EventLists.add_agent!(a, get_alist(s, typeof(a)), calc_rates(a))
 	# rates have changed => redraw waiting time
 	refresh_simulation!(s)
 end
@@ -467,7 +467,7 @@ end
 function spawn_pop!(agents, s) 
 	for a in agents
 		scheduled_action!(a, s)
-	    Events.add_agent!(a, get_alist(s, typeof(a)), calc_rates(a))
+	    EventLists.add_agent!(a, get_alist(s, typeof(a)), calc_rates(a))
 	end
 	# rates have changed => redraw waiting time
 	refresh_simulation!(s)
