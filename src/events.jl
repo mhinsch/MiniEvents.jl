@@ -13,11 +13,17 @@ end
 function gen_refresh_fn(decl)
     ag_type = decl.args[2]
 	quote $(esc(:(
-        MiniEvents.refresh!(agent::$ag_type, alist) = 
-			MiniEvents.change_rates!(agent, alist, MiniEvents.calc_rates(agent))
+        MiniEvents.refresh!(agent::$ag_type, alist, sim) = 
+			MiniEvents.change_rates!(agent, alist, MiniEvents.calc_rates(agent, sim))
 	))) end 
 end
 
+function filter_sim(code, sim_name)
+	MacroTools.postwalk(code) do x
+		@capture(x, @sim()) ? sim_name : x
+	end
+end	
+	
 "Calculate transition rates for all events for a given agent types."
 function calc_rates end
 "Generates `calc_rates(type_decl, conditions, rates)` for a given agent type."
@@ -31,9 +37,11 @@ function gen_calc_rate_fn(decl, conds, rates)
         push!(con_call.args, arg)
     end
 
+	sim_name = gensym("sim")
+
     quote
-        function $(esc(:(MiniEvents.calc_rates)))($(esc(decl))) 
-            $con_call
+        function $(esc(:(MiniEvents.calc_rates)))($(esc(decl)), $sim_name) 
+            $(filter_sim(con_call, sim_name))
         end
     end
 end
@@ -44,7 +52,7 @@ function filter_refreshs(actions, r_arg)
 		if @capture(x, @r(args__))
 			ret = quote end
 			for arg in args
-				ex = :(refresh!($arg, $r_arg))
+				ex = :(refresh!($arg, $r_arg, @sim()))
 				push!(ret.args, ex)
 			end
 			ret
@@ -60,8 +68,10 @@ function next_rate_event! end
 function gen_rate_event_fn(decl, actions)
     check_actions = quote end
 
+	sim_name = gensym("sim")
+
     for (i, a) in enumerate(actions)
-		act = filter_refreshs(a, :alist)
+		act = filter_sim(filter_refreshs(a, :alist), sim_name)
         check = :(if (r -= rates[$i]) < 0
                       $(esc(act))
                       return
@@ -75,7 +85,7 @@ function gen_rate_event_fn(decl, actions)
 
     quote
         function $(esc(:(MiniEvents.next_rate_event!)))(
-			$(esc(:( alist :: MiniEvents.EventList{$ag_type, $l_type}))), rnum)
+			$(esc(:( alist :: MiniEvents.EventList{$ag_type, $l_type}))), rnum, $(esc(sim_name)))
 
             i, r = lookup($(esc(:alist)).sums, rnum)
 
@@ -110,7 +120,7 @@ function gen_scheduled_action_fn(decl, interval, start, action)
 		:() : # return noop function if no actions are provided
 		quote 
 			MiniEvents.schedule_in!(agent, dt, MiniEvents.get_scheduler($sim_name, $ag_type)) do $decl 
-				$action
+				$(filter_sim(action, sim_name))
 				$repeat
 			end
 		end	
@@ -147,7 +157,7 @@ function generate_events_code(decl, conds, rates, actions, sched_exprs)
 end
 
 
-function parse_events(decl_agent, block, decl_world=nothing)
+function parse_events(decl_agent, block)
 	block = rmlines(block)
 	rates = []
 	conds = []
@@ -192,7 +202,3 @@ macro events(decl_agent, block)
 	parse_events(decl_agent, block)
 end
 
-
-macro events(decl_agent, decl_world, block)
-	parse_events(decl_agent, block, decl_world)
-end

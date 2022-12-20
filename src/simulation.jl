@@ -56,7 +56,6 @@ function refresh_simulation!(sim)
 end
 
 
-
 function gen_next_in_dtime!(t_next_evt , sim, schedulers...)
 	t_expr = quote end
 	t_args = t_expr.args	
@@ -112,9 +111,9 @@ end
 end
 
 
-function dispatch_time_or_rates end
+function next_event! end
 	
-function gen_time_or_rates_fn(n_alists, n_schedulers)
+function gen_next_event_fn(n_alists, n_schedulers)
 # *** waiting time
 	
 	# draw waiting time
@@ -145,7 +144,7 @@ function gen_time_or_rates_fn(n_alists, n_schedulers)
 		push!(sal_args, 
 			quote
 				if r <= $sname
-					return next_rate_event!(sim.$al_name, r)
+					return next_rate_event!(sim.$al_name, r, sim)
 				end
 				r -= $sname
 			end)
@@ -156,7 +155,7 @@ function gen_time_or_rates_fn(n_alists, n_schedulers)
 
 # *** put everything together
 	quote 
-		function $(esc(:(MiniEvents.dispatch_time_or_rates)))(sim) 		
+		function $(esc(:(MiniEvents.next_event!)))(sim) 		
 			# calc sum of rates
 			$(gen_calc_sum_rates(n_alists))
 			# rate event has been triggered or rates been changes
@@ -221,7 +220,7 @@ macro simulation(name, types...)
 		push!(get_sched_fns, get_sched_fn) 
 	end
 
-	time_rates_fn = gen_time_or_rates_fn(length(types), length(types))
+	next_event_fn = gen_next_event_fn(length(types), length(types))
 
 	sched_fn = :(Scheduler.schedule!(fun, obj, at, sim::$(esc(name))) =
 		schedule!(fun, obj, at, get_scheduler(sim, typeof(obj))))
@@ -239,8 +238,6 @@ macro simulation(name, types...)
 
 		$sched_fn
 
-		$time_rates_fn
-
-        $(esc(:step!))(sim :: $(esc(name))) = dispatch_time_or_rates(sim)
+		$next_event_fn
     end |> MacroTools.flatten
 end
