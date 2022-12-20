@@ -1,4 +1,4 @@
-module Events
+module EventLists
 
 export AgentEvents, EventList, lookup, change_rates!, add_agent!, remove_agent!
 
@@ -167,4 +167,4 @@ function recalculate!(alist, idx)
 	alist.sums[idx] = sum_left + sum_right + sum_rates(alist.events[idx])
 end
 
-end # module Events
+end # module EventLists
