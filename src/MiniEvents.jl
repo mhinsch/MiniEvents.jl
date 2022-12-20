@@ -9,10 +9,10 @@ export @events, @simulation, refresh!, schedule!, spawn!, now
 
 
 include("EventLists.jl")
-@reexport using .EventLists
+using .EventLists
 
 include("Scheduler.jl")
-@reexport using .Scheduler
+using .Scheduler
 
 
 include("events.jl")

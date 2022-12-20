@@ -69,15 +69,17 @@ function gen_rate_event_fn(decl, actions)
         push!(check_actions.args, check)
     end
 
-    l_type = :(VecType{$(length(actions)), Float64})
+    l_type = :(MiniEvents.VecType{$(length(actions)), Float64})
     ag_name = decl.args[1]
     ag_type = decl.args[2]
 
     quote
-        function $(esc(:(MiniEvents.next_rate_event!)))($(esc(:alist)) :: $(esc(:EventList)){$(esc(ag_type)), $l_type}, rnum)
-            i, r = lookup(alist.sums, rnum)
+        function $(esc(:(MiniEvents.next_rate_event!)))(
+			$(esc(:( alist :: MiniEvents.EventList{$ag_type, $l_type}))), rnum)
 
-            ag_actions = alist.events[i]
+            i, r = lookup($(esc(:alist)).sums, rnum)
+
+            ag_actions = $(esc(:alist)).events[i]
             rates = ag_actions.rates
             $(esc(ag_name)) = ag_actions.agent
 
@@ -107,7 +109,7 @@ function gen_scheduled_action_fn(decl, interval, start, action)
 	fn_body = isempty(action.args) ?
 		:() : # return noop function if no actions are provided
 		quote 
-			Scheduler.schedule_in!(agent, dt, MiniEvents.get_scheduler($sim_name, $ag_type)) do $decl 
+			MiniEvents.schedule_in!(agent, dt, MiniEvents.get_scheduler($sim_name, $ag_type)) do $decl 
 				$action
 				$repeat
 			end
