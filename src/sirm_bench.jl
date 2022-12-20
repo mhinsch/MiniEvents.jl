@@ -4,6 +4,7 @@ using StaticArrays
 using Distributions
 
 include("MiniEvents.jl")
+using .MiniEvents
 
 # all possible states a person can be in
 @enum Status susceptible infected recovered

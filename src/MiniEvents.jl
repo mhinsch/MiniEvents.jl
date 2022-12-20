@@ -1,13 +1,19 @@
+module MiniEvents
+
 using MacroTools
 using StaticArrays 
 using Distributions
+using Reexport
+
+export @events, @simulation, refresh!, schedule!, spawn!
 
 
 include("Events.jl")
-using .Events
+@reexport using .Events
 
 include("Scheduler.jl")
-using .Scheduler
+@reexport using .Scheduler
+
 
 "Generic `refresh!` for iterables of agents."
 function refresh!(agents, alist)
@@ -25,43 +31,48 @@ const VecType = SVector
 
 # *** generators for agent type specific helper functions
 
+function event_count end
 "Generates `event_count(type)` for given type."
 function gen_event_count_fn(decl, n)
     ag_type = decl.args[2]
-    quote
-        function $(esc(:event_count))(::Type{$ag_type}) 
-            $n
-        end
-    end
+	quote $(esc(:(
+        MiniEvents.event_count(::Type{$ag_type}) = $n
+	))) end 
 end
 
 "Generates `refresh!(agent, alist)` for given type."
 function gen_refresh_fn(decl)
     ag_type = decl.args[2]
-    quote
-        function $(esc(:refresh!))(agent::$ag_type, alist)
-            change_rates!(agent, alist, calc_rates(agent))
-        end
-    end
+	quote $(esc(:(
+        MiniEvents.refresh!(agent::$ag_type, alist) = 
+			MiniEvents.change_rates!(agent, alist, MiniEvents.calc_rates(agent))
+	))) end 
 end
 
+function get_alist end
 "Generates `get_alist(sim, type)` for given type."
 function gen_get_alist_fn(ag_type, n)
 	alist_name = alist_mem_name(n)
-	:($(esc(:get_alist))(sim, ::Type{$ag_type}) = sim.$alist_name)
+	quote $(esc(:(
+			MiniEvents.get_alist(sim, ::Type{$ag_type}) = sim.$alist_name
+	))) end 
 end
 
 
+function get_scheduler end
 "Generates `get_scheduler(sim, type)` for given type."
 function gen_get_scheduler_fn(ag_type, n)
 	sched_name = sched_mem_name(n)
-	:($(esc(:get_scheduler))(sim, ::Type{$ag_type}) = sim.$sched_name)
+	quote $(esc(:(
+			MiniEvents.get_scheduler(sim, ::Type{$ag_type}) = sim.$sched_name
+	))) end
 end
 
+function calc_rates end
 
 function gen_calc_rate_fn(decl, conds, rates)
     n = length(conds)
-    VT = :(VecType{$n, Float64})
+    VT = :(VecType{$n, $(esc(:Float64))})
 
     con_call = :($VT())
     for (c, r) in zip(conds, rates)
@@ -70,22 +81,24 @@ function gen_calc_rate_fn(decl, conds, rates)
     end
 
     quote
-        function $(esc(:calc_rates))($(esc(decl))) 
+        function $(esc(:(MiniEvents.calc_rates)))($(esc(decl))) 
             $con_call
         end
     end
 end
 
 
+function scheduled_action! end
 "Generate the initial scheduling to be done by `add_agent`."
 function gen_scheduled_action_fn(decl, interval, start, action)
     ag_name = decl.args[1]
     ag_type = decl.args[2]
 
-	fun_name = :($(esc(:scheduled_action!)))
+	fun_name = :(MiniEvents.scheduled_action!)
+	sim_name = gensym("sim")
 
 	repeat = if interval != nothing
-			:($fun_name($(esc(ag_name)), sim, $interval))
+			:($fun_name($ag_name, $sim_name, $interval))
 		else
 			:()
 		end
@@ -93,18 +106,20 @@ function gen_scheduled_action_fn(decl, interval, start, action)
 	fn_body = isempty(action.args) ?
 		:() : # return noop function if no actions are provided
 		quote 
-			schedule_in!($ag_name, dt, get_scheduler(sim, $ag_type)) do $(esc(decl)) 
-				$(esc(action))
+			Scheduler.schedule_in!(agent, dt, MiniEvents.get_scheduler($sim_name, $ag_type)) do $decl 
+				$action
 				$repeat
 			end
 		end	
 
 	quote
-		# first interation starts at $start
-		function $fun_name($decl, sim, dt=$start)
-			$fn_body
-		end
-	end
+		$(esc(:(
+			# first interation starts at $start
+			function $fun_name(agent::$ag_type, $sim_name, dt=$start)
+				$fn_body
+			end
+		)))
+	end |> MacroTools.flatten
 end
 
 
@@ -124,8 +139,10 @@ function filter_refreshs(actions, r_arg)
 	end
 end
 
-"Generate `step!(alist)` for a single type, including all actions."
-function gen_step_fn(decl, actions)
+function next_rate_event! end
+
+"Generate `next_rate_event!(alist)` for a single type, including all actions."
+function gen_rate_event_fn(decl, actions)
     check_actions = quote end
 
     for (i, a) in enumerate(actions)
@@ -142,7 +159,7 @@ function gen_step_fn(decl, actions)
     ag_type = decl.args[2]
 
     quote
-        function $(esc(:step!))($(esc(:alist)) :: $(esc(:EventList)){$ag_type, $l_type}, rnum)
+        function $(esc(:(MiniEvents.next_rate_event!)))($(esc(:alist)) :: $(esc(:EventList)){$(esc(ag_type)), $l_type}, rnum)
             i, r = lookup(alist.sums, rnum)
 
             ag_actions = alist.events[i]
@@ -210,13 +227,13 @@ function generate_events_code(decl, conds, rates, actions, sched_exprs)
     fd = gen_calc_rate_fn(decl, conds, rates)
     push!(res.args, fd)
 
-    fd = gen_step_fn(decl, actions)
+    fd = gen_rate_event_fn(decl, actions)
     push!(res.args, fd)
 
 	fd = gen_scheduled_action_fn(decl, sched_exprs...)
     push!(res.args, fd)
     
-	res
+	res |> MacroTools.flatten
 end
 
 
@@ -298,7 +315,8 @@ function gen_calc_sum_rates(n_alists)
 	Expr(:block, cs_args...)
 end
 
-
+function dispatch_time_or_rates end
+	
 function gen_time_or_rates_fn(n_alists, n_schedulers)
 # *** sum of rates and waiting time
 	
@@ -330,7 +348,7 @@ function gen_time_or_rates_fn(n_alists, n_schedulers)
 		push!(sal_args, 
 			quote
 				if r <= $sname
-					return step!(sim.$al_name, r)
+					return next_rate_event!(sim.$al_name, r)
 				end
 				r -= $sname
 			end)
@@ -341,7 +359,7 @@ function gen_time_or_rates_fn(n_alists, n_schedulers)
 
 # *** put everything together
 	quote 
-		function $(esc(:dispatch_time_or_rates))(sim) 		
+		function $(esc(:(MiniEvents.dispatch_time_or_rates)))(sim) 		
 			# calc sum of rates
 			$(gen_calc_sum_rates(n_alists))
 			# rate event has been triggered or rates been changes
@@ -369,7 +387,7 @@ end
 macro simulation(name, types...)
 	# struct declaration and members
     decl = :(mutable struct $name 
-		t_next_evt  :: Float64
+		t_next_evt  :: $(esc(:Float64))
 		end)
     members = decl.args[3].args
 	
@@ -382,7 +400,7 @@ macro simulation(name, types...)
 	# generate alist members for rate-based scheduling
     for (i, t) in enumerate(types)
         al_name = alist_mem_name(i)
-        al_type = :(EventList{$t, VecType{event_count($t), Float64}})
+        al_type = :(EventList{$(esc(t)), VecType{event_count($(esc(t))), $(esc(Float64))}})
         al_e = :($al_name :: $al_type)
         push!(members, al_e)
         push!(args, :($al_type()))
@@ -396,7 +414,7 @@ macro simulation(name, types...)
 	# generate scheduler members for time-based scheduling
 	for (i, t) in enumerate(types)
 		sched_name = sched_mem_name(i)
-		sched_type = :(PQScheduler{Float64, $t})
+		sched_type = :(PQScheduler{$(esc(Float64)), $(esc(t))})
 		
 		sched_e = :($sched_name :: $sched_type)
 
@@ -409,14 +427,16 @@ macro simulation(name, types...)
 
 	time_rates_fn = gen_time_or_rates_fn(length(types), length(types))
 
-	sched_fn = :(Scheduler.schedule!(fun, obj, at, sim::$name) =
+	sched_fn = :(Scheduler.schedule!(fun, obj, at, sim::$(esc(name))) =
 		schedule!(fun, obj, at, get_scheduler(sim, typeof(obj))))
 
     quote
         $decl
         $(esc(name))() = $constr
 
-		$(esc(:num_agent_types))(::Type{$name}) = $(length(types))
+#		$(esc(:(
+#			MiniEvents.num_agent_types(::Type{$name}) = $(length(types))
+#		)))
 
 		$(get_alist_fns...)
 		$(get_sched_fns...)
@@ -425,8 +445,8 @@ macro simulation(name, types...)
 
 		$time_rates_fn
 
-        $(esc(:step!))(sim :: $name) = dispatch_time_or_rates(sim)
-    end
+        $(esc(:step!))(sim :: $(esc(name))) = dispatch_time_or_rates(sim)
+    end |> MacroTools.flatten
 end
 
 @generated now(sim) = :(time_now(sim.$(sched_mem_name(1))))
@@ -462,4 +482,4 @@ macro events(decl_agent, decl_world, block)
 	parse_events(decl_agent, block, decl_world)
 end
 
-
+end # MiniEvents.jl
