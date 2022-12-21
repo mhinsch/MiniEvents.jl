@@ -83,7 +83,17 @@ function gen_rate_event_fn(decl, actions, debug = false)
     ag_name = decl.args[1]
     ag_type = decl.args[2]
 
-	debug_code = debug ? :(@assert rates == calc_rates(ag_actions.agent, $sim_name)) : :()
+	debug_code = if debug 
+		quote 
+			crates = calc_rates(ag_actions.agent, $sim_name)
+			if rates != crates				
+				println(stderr, "rate mismatch detected: stored ($rates) != calculated ($crates)")
+				exit(1)
+			end
+		end
+	else
+		:()
+	end
 
     quote
         function $(esc(:(MiniEvents.next_rate_event!)))(
