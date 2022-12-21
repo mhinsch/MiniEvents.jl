@@ -65,7 +65,7 @@ end
 "Trigger the next rate event for a type."
 function next_rate_event! end
 "Generate `next_rate_event!(alist)` for a single type, including all actions."
-function gen_rate_event_fn(decl, actions)
+function gen_rate_event_fn(decl, actions, debug = false)
     check_actions = quote end
 
 	sim_name = gensym("sim")
@@ -83,6 +83,8 @@ function gen_rate_event_fn(decl, actions)
     ag_name = decl.args[1]
     ag_type = decl.args[2]
 
+	debug_code = debug ? :(@assert rates == calc_rates(ag_actions.agent, $sim_name)) : :()
+
     quote
         function $(esc(:(MiniEvents.next_rate_event!)))(
 			$(esc(:( alist :: MiniEvents.EventList{$ag_type, $l_type}))), rnum, $(esc(sim_name)))
@@ -91,6 +93,7 @@ function gen_rate_event_fn(decl, actions)
 
             ag_actions = $(esc(:alist)).events[i]
             rates = ag_actions.rates
+			$debug_code 
             $(esc(ag_name)) = ag_actions.agent
 
             $check_actions
@@ -135,7 +138,7 @@ function gen_scheduled_action_fn(decl, interval, start, action)
 	end |> MacroTools.flatten
 end
 
-function generate_events_code(decl, conds, rates, actions, sched_exprs)
+function generate_events_code(decl, conds, rates, actions, sched_exprs, debug = false)
     res = quote end
 
     fd = gen_event_count_fn(decl, length(conds))
@@ -147,7 +150,7 @@ function generate_events_code(decl, conds, rates, actions, sched_exprs)
     fd = gen_calc_rate_fn(decl, conds, rates)
     push!(res.args, fd)
 
-    fd = gen_rate_event_fn(decl, actions)
+    fd = gen_rate_event_fn(decl, actions, debug)
     push!(res.args, fd)
 
 	fd = gen_scheduled_action_fn(decl, sched_exprs...)
@@ -169,9 +172,12 @@ function parse_events(decl_agent, block)
 	expr_action = :()
 	sched_exprs = expr_interval, expr_start, expr_action
 	has_sched = false
+	debug = false
 
 	for line in block.args
-		if @capture(line, @rate(expr_rate_) ~ expr_cond_ => expr_act_)
+		if @capture(line, @debug)
+			debug = true
+		elseif @capture(line, @rate(expr_rate_) ~ expr_cond_ => expr_act_)
 			push!(rates, expr_rate)
 			push!(conds, expr_cond)
 			push!(actions, expr_act)
@@ -194,7 +200,7 @@ function parse_events(decl_agent, block)
 		end
 	end
 	
-	generate_events_code(decl_agent, conds, rates, actions, sched_exprs)
+	generate_events_code(decl_agent, conds, rates, actions, sched_exprs, debug)
 end
 
 

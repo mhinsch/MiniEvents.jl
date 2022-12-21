@@ -3,8 +3,9 @@ using BenchmarkTools
 using StaticArrays
 using Distributions
 
-include("MiniEvents.jl")
-using .MiniEvents
+push!(LOAD_PATH, "./src")
+
+using MiniEvents
 
 # all possible states a person can be in
 @enum Status susceptible infected recovered
@@ -31,6 +32,7 @@ Person(state) = Person(state, [])
 end
 
 @events person::Person begin
+	#@debug
     @rate(count(p -> p.status == infected, person.contacts) + 1e-6) ~
 	    person.status == susceptible =>
  	    begin
