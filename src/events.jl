@@ -29,20 +29,21 @@ function calc_rates end
 "Generates `calc_rates(type_decl, conditions, rates)` for a given agent type."
 function gen_calc_rate_fn(decl, conds, rates)
     n = length(conds)
-    VT = :(VecType{$n, $(esc(:Float64))})
+    VT = :(MiniEvents.VecType{$n, Float64})
 
     con_call = :($VT())
     for (c, r) in zip(conds, rates)
-        arg = :($(esc(c)) ? $(esc(r)) : 0.0)
+        arg = :($c ? $r : 0.0)
         push!(con_call.args, arg)
     end
 
 	sim_name = gensym("sim")
 
-    quote
-        function $(esc(:(MiniEvents.calc_rates)))($(esc(decl)), $sim_name) 
+    quote $(esc(:( 
+        function MiniEvents.calc_rates($decl, $sim_name) 
             $(filter_sim(con_call, sim_name))
         end
+		)))
     end
 end
 

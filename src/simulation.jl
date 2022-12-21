@@ -191,7 +191,7 @@ macro simulation(name, args...)
 	if typeof(l_arg) == Expr &&	l_arg.head == :block 
 		@assert length(args)>1 sim_syntax_error
 		# just declarations
-		add_decls = rmlines(l_arg).args
+		add_decls = [esc(x) for x in rmlines(l_arg).args]
 		types = args[1:end-1]
 	else
 		add_decls = []
@@ -200,14 +200,10 @@ macro simulation(name, args...)
 
 	# struct declaration and members
     decl = :(mutable struct $name 
-		$(isempty(add_decls) ? () : esc(add_decls...))
+		$(add_decls...)
 		t_next_evt  :: $(esc(:Float64))
 		end)
     members = decl.args[3].args
-	#if !isempty(add_decls)
-	#	# include line nodes for easier debugging
-	#	prepend!(members, add_decls_raw)
-	#end
 	
 	# constructor and arguments
 	constr_decl_args = [gensym("arg") for x in rmlines(add_decls)]

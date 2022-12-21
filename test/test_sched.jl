@@ -49,7 +49,7 @@ end
 
 @events self::A1 begin
 	@debug
-	@rate(2.0)	~ self.state == asleep				=> begin
+	@rate(@sim().wake_rate)	~ self.state == asleep				=> begin
 		wakeup(self); @r self end
 	@rate(1.0)	~ self.state == asleep				=> begin
 		sleep(self); @r self end
@@ -75,6 +75,7 @@ end
 
 @simulation Sim A1 Model begin
 	model :: Model
+	wake_rate :: Float64
 	end
 
 function setup(sim)
@@ -88,7 +89,7 @@ function run(n, sim)
 	println(now(sim))
 end
 
-const simulation = Sim(Model())
+const simulation = Sim(Model(), 1.5)
 
 setup(simulation)
 
