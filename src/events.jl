@@ -13,8 +13,8 @@ end
 function gen_refresh_fn(decl)
     ag_type = decl.args[2]
 	quote $(esc(:(
-        MiniEvents.refresh!(agent::$ag_type, alist, sim) = 
-			MiniEvents.change_rates!(agent, alist, MiniEvents.calc_rates(agent, sim))
+        MiniEvents.refresh!(agent::$ag_type, sim) = 
+			MiniEvents.change_rates!(agent, MiniEvents.get_alist(sim, $ag_type), MiniEvents.calc_rates(agent, sim))
 	))) end 
 end
 
@@ -47,12 +47,12 @@ function gen_calc_rate_fn(decl, conds, rates)
 end
 
 "Replace @r with calls to refresh."
-function filter_refreshs(actions, r_arg)
+function filter_refreshs(actions)
 	MacroTools.postwalk(actions) do x
 		if @capture(x, @r(args__))
 			ret = quote end
 			for arg in args
-				ex = :(refresh!($arg, $r_arg, @sim()))
+				ex = :(refresh!($arg, @sim()))
 				push!(ret.args, ex)
 			end
 			ret
@@ -71,7 +71,7 @@ function gen_rate_event_fn(decl, actions)
 	sim_name = gensym("sim")
 
     for (i, a) in enumerate(actions)
-		act = filter_sim(filter_refreshs(a, :alist), sim_name)
+		act = filter_sim(filter_refreshs(a), sim_name)
         check = :(if (r -= rates[$i]) < 0
                       $(esc(act))
                       return
@@ -120,7 +120,7 @@ function gen_scheduled_action_fn(decl, interval, start, action)
 		:() : # return noop function if no actions are provided
 		quote 
 			MiniEvents.schedule_in!(agent, dt, MiniEvents.get_scheduler($sim_name, $ag_type)) do $decl 
-				$(filter_sim(action, sim_name))
+				$(filter_sim(filter_refreshs(action), sim_name))
 				$repeat
 			end
 		end	

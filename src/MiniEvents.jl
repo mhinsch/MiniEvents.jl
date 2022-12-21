@@ -20,9 +20,11 @@ include("simulation.jl")
 
 
 "Generic `refresh!` for iterables of agents."
-function refresh!(agents, alist, sim)
+function refresh!(agents, sim)
+	# this is slightly less efficient than calling change_rates directly
+	# but this way heterogeneous collections are supported as well
 	for agent in agents
-		change_rates!(agent, alist, calc_rates(agent, sim))
+		refresh!(agent, sim)
 	end
 end
 

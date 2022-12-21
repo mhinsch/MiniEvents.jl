@@ -48,7 +48,6 @@ function fallasleep(a::A1)
 end
 
 @events self::A1 begin
-	# wake up
 	@rate(2.0)	~ self.state == asleep				=> begin
 		wakeup(self); @r self end
 	@rate(1.0)	~ self.state == asleep				=> begin
@@ -67,6 +66,7 @@ end
 			push!(m.pop, A1(length(m.pop)))
 			spawn!(m.pop[end], @sim())
 			println("added agent")
+			@r m.pop[end]
 		end
 	end
 end
