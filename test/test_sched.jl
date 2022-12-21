@@ -73,10 +73,12 @@ end
 	end
 end
 
-@simulation Sim A1 Model
+@simulation Sim A1 Model begin
+	model :: Model
+	end
 
 function setup(sim)
-	spawn!(Model(), sim)
+	spawn!(sim.model, sim)
 end
 
 function run(n, sim)
@@ -86,7 +88,7 @@ function run(n, sim)
 	println(now(sim))
 end
 
-const simulation = Sim()
+const simulation = Sim(Model())
 
 setup(simulation)
 

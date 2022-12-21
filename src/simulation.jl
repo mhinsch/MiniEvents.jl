@@ -179,16 +179,39 @@ function gen_next_event_fn(n_alists, n_schedulers)
 	end |> MacroTools.flatten
 end
 
-macro simulation(name, types...)
+const sim_syntax_error =
+	"expected: @simulation <name> <type> [ <type>...] [ <declarations> ]"
+
+macro simulation(name, args...)
+
+	@assert length(args)>0 sim_syntax_error
+	
+	# check for user elements for sim type
+	l_arg = args[end]
+	if typeof(l_arg) == Expr &&	l_arg.head == :block 
+		@assert length(args)>1 sim_syntax_error
+		# just declarations
+		add_decls = rmlines(l_arg).args
+		types = args[1:end-1]
+	else
+		add_decls = []
+		types = args
+	end
+
 	# struct declaration and members
     decl = :(mutable struct $name 
+		$(isempty(add_decls) ? () : esc(add_decls...))
 		t_next_evt  :: $(esc(:Float64))
 		end)
     members = decl.args[3].args
+	#if !isempty(add_decls)
+	#	# include line nodes for easier debugging
+	#	prepend!(members, add_decls_raw)
+	#end
 	
 	# constructor and arguments
-    constr = :($(esc(name))(0.0))
-	args = constr.args
+	constr_decl_args = [gensym("arg") for x in rmlines(add_decls)]
+    constr_call_args = vcat(constr_decl_args, :(0.0))
 
 	get_alist_fns = []
 
@@ -198,7 +221,7 @@ macro simulation(name, types...)
         al_type = :(EventList{$(esc(t)), VecType{event_count($(esc(t))), $(esc(Float64))}})
         al_e = :($al_name :: $al_type)
         push!(members, al_e)
-        push!(args, :($al_type()))
+        push!(constr_call_args, :($al_type()))
 
 		get_alist_fn = gen_get_alist_fn(t, i)
 		push!(get_alist_fns, get_alist_fn) 
@@ -214,7 +237,7 @@ macro simulation(name, types...)
 		sched_e = :($sched_name :: $sched_type)
 
 		push!(members, sched_e)
-		push!(args, :($sched_type()))
+		push!(constr_call_args, :($sched_type()))
 
 		get_sched_fn = gen_get_scheduler_fn(t, i)
 		push!(get_sched_fns, get_sched_fn) 
@@ -227,7 +250,7 @@ macro simulation(name, types...)
 
     quote
         $decl
-        $(esc(name))() = $constr
+        $(esc(name))($(constr_decl_args...)) = $(esc(name))($(constr_call_args...))
 
 #		$(esc(:(
 #			MiniEvents.num_agent_types(::Type{$name}) = $(length(types))
