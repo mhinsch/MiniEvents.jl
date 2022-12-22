@@ -63,11 +63,12 @@ end
 
 @events m::Model begin
 	@debug
-	@repeat(1.0, 0.1) => begin
+	@repeat((1.0/(length(@sim().model.pop)+1)), 0.1) => begin
 		if length(m.pop) < 10
 			push!(m.pop, A1(length(m.pop)))
 			spawn!(m.pop[end], @sim())
-			println("added agent")
+			t = now(@sim())
+			println("$t: added agent")
 			@r m.pop[end] # redundant, just to see if it works
  		end
 	end

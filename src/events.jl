@@ -18,6 +18,18 @@ function gen_refresh_fn(decl)
 	))) end 
 end
 
+"Generates `kill!(agent, alist)` for given type."
+function gen_kill_fn(decl)
+    ag_type = decl.args[2]
+	quote $(esc(:(
+        function MiniEvents.kill!(agent::$ag_type, sim) 
+			MiniEvents.remove_agent!(agent, MiniEvents.get_alist(sim, $ag_type))
+			MiniEvents.unschedule!(MiniEvents.get_scheduler(sim, $ag_type), agent)
+		end
+	))) end 
+end
+
+
 function filter_sim(code, sim_name)
 	MacroTools.postwalk(code) do x
 		@capture(x, @sim()) ? sim_name : x
@@ -47,6 +59,22 @@ function gen_calc_rate_fn(decl, conds, rates)
     end
 end
 
+"Replace @kill with calls to kill!."
+function filter_kills(actions)
+	MacroTools.postwalk(actions) do x
+		if @capture(x, @kill(args__))
+			ret = quote end
+			for arg in args
+				ex = :(kill!($arg, @sim()))
+				push!(ret.args, ex)
+			end
+			ret
+		else
+			x
+		end
+	end
+end
+
 "Replace @r with calls to refresh."
 function filter_refreshs(actions)
 	MacroTools.postwalk(actions) do x
@@ -72,7 +100,7 @@ function gen_rate_event_fn(decl, actions, debug = false)
 	sim_name = gensym("sim")
 
     for (i, a) in enumerate(actions)
-		act = filter_sim(filter_refreshs(a), sim_name)
+		act = filter_sim(filter_kills(filter_refreshs(a)), sim_name)
         check = :(if (r -= rates[$i]) < 0
                       $(esc(act))
                       return
@@ -123,6 +151,10 @@ function gen_scheduled_action_fn(decl, interval, start, action)
 
 	fun_name = :(MiniEvents.scheduled_action!)
 	sim_name = gensym("sim")
+	delta_t = gensym("delta_t")
+
+	interval = filter_sim(interval, sim_name)
+	start = filter_sim(start, sim_name)
 
 	repeat = if interval != nothing
 			:($fun_name($ag_name, $sim_name, $interval))
@@ -133,19 +165,23 @@ function gen_scheduled_action_fn(decl, interval, start, action)
 	fn_body = isempty(action.args) ?
 		:() : # return noop function if no actions are provided
 		quote 
-			MiniEvents.schedule_in!(agent, dt, MiniEvents.get_scheduler($sim_name, $ag_type)) do $decl 
-				$(filter_sim(filter_refreshs(action), sim_name))
+			MiniEvents.schedule_in!(agent, $delta_t, MiniEvents.get_scheduler($sim_name, $ag_type)) do $decl 
+				$(filter_sim(filter_kills(filter_refreshs(action)), sim_name))
 				$repeat
 			end
 		end	
 
 	quote
-		$(esc(:(
-			# first interation starts at $start
-			function $fun_name(agent::$ag_type, $sim_name, dt=$start)
+		$(esc( quote
+			function $fun_name(agent::$ag_type, $sim_name)
+				$delta_t = $start
 				$fn_body
 			end
-		)))
+			# first interation starts at $start
+			function $fun_name(agent::$ag_type, $sim_name, $delta_t)
+				$fn_body
+			end
+		end ))
 	end |> MacroTools.flatten
 end
 
@@ -156,6 +192,9 @@ function generate_events_code(decl, conds, rates, actions, sched_exprs, debug = 
     push!(res.args, fd)
 
     fd = gen_refresh_fn(decl)
+    push!(res.args, fd)
+
+    fd = gen_kill_fn(decl)
     push!(res.args, fd)
 
     fd = gen_calc_rate_fn(decl, conds, rates)

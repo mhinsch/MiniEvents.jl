@@ -5,7 +5,7 @@ using StaticArrays
 using Distributions
 using Reexport
 
-export @events, @simulation, refresh!, schedule!, spawn!, spawn_pop!, next_event!, now
+export @events, @simulation, refresh!, kill!, schedule!, spawn!, spawn_pop!, next_event!, now
 
 
 include("EventLists.jl")
@@ -19,12 +19,19 @@ include("events.jl")
 include("simulation.jl")
 
 
-"Generic `refresh!` for iterables of agents."
+"Recalculate event rates for agents. Generic version for iterables of agents."
 function refresh!(agents, sim)
 	# this is slightly less efficient than calling change_rates directly
 	# but this way heterogeneous collections are supported as well
 	for agent in agents
 		refresh!(agent, sim)
+	end
+end
+
+"Remove all agent events (rates as well as scheduled). Generic version for iterables of agents."
+function kill!(agents, sim)
+	for agent in agents
+		kill!(agent, sim)
 	end
 end
 
