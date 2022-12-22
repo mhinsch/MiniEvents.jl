@@ -17,34 +17,36 @@ end
 Model() = Model([])
 
 
-function A1(i)
-	A1(i, asleep, 0)
-end
+A1(i) = A1(i, asleep, 0)
 
 
 function wakeup(a::A1)
-	println("$(a.id): wake up")
+	println("$(a.id), $(a.food): wake up")
 	a.state = awake
 end
 
 function sleep(a::A1)
-	println("$(a.id): sleep")
+	println("$(a.id), $(a.food): sleep")
 	a.food -= 1
 end
 
 function walk(a::A1)
-	println("$(a.id): walk")
+	println("$(a.id), $(a.food): walk")
 	a.food -= 1
 end
 
 function forage(a::A1)
-	println("$(a.id): forage")
+	println("$(a.id), $(a.food): forage")
 	a.food += rand(1:5)
 end
 
 function fallasleep(a::A1)
-	println("$(a.id): go to bed")
+	println("$(a.id), $(a.food): go to bed")
 	a.state = asleep
+end
+
+function die(a::A1)
+	println("$(a.id), $(a.food): dying")
 end
 
 @events self::A1 begin
@@ -59,6 +61,8 @@ end
 		forage(self); @r self end
 	@rate(3.0)	~ self.state == awake && self.food > 1	=> begin
 		fallasleep(self); @r self end
+	@rate(-self.food * 2.0) ~ self.food < 0				=> begin
+		die(self); @kill self end
 end
 
 @events m::Model begin

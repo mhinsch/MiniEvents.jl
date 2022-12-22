@@ -22,6 +22,8 @@ time_type(sched::PQScheduler{TIME, OBJ}) where {TIME, OBJ} = TIME
 "Returns true if the scheduler does not contain any actions."
 Base.isempty(scheduler::PQScheduler) = isempty(scheduler.queue)
 
+Base.haskey(scheduler::PQScheduler, obj) = haskey(scheduler.actions, obj)
+
 "Add a single item to the scheduler. Adds function `fun` to be called on `obj` at time `at` to `scheduler`."
 function schedule!(fun, obj, at, scheduler)
 	scheduler.queue[obj] = at

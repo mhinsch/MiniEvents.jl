@@ -33,6 +33,9 @@ right(idx) = 2*idx + 1
 parent(idx) = idx ÷ 2
 
 
+Base.haskey(el::EventList, agent) = haskey(el.indices, agent)
+
+
 function lookup(sums, prob)
 	if isempty(sums) || prob > sums[1]
 		return 0, prob

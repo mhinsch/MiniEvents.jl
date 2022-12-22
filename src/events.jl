@@ -23,8 +23,14 @@ function gen_kill_fn(decl)
     ag_type = decl.args[2]
 	quote $(esc(:(
         function MiniEvents.kill!(agent::$ag_type, sim) 
-			MiniEvents.remove_agent!(agent, MiniEvents.get_alist(sim, $ag_type))
-			MiniEvents.unschedule!(MiniEvents.get_scheduler(sim, $ag_type), agent)
+			al = MiniEvents.get_alist(sim, $ag_type)
+			if haskey(al, agent)
+				MiniEvents.remove_agent!(agent, al)
+			end
+			sched = MiniEvents.get_scheduler(sim, $ag_type)
+			if haskey(sched, agent)
+				MiniEvents.unschedule!(sched, agent)
+			end
 		end
 	))) end 
 end
