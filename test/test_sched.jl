@@ -49,25 +49,25 @@ function die(a::A1)
 	println("$(a.id), $(a.food): dying")
 end
 
-@events self::A1 begin
+@events agent::A1 begin
 	@debug
-	@rate(@sim().wake_rate)	~ self.state == asleep				=> begin
-		wakeup(self); @r self end
-	@rate(1.0)	~ self.state == asleep				=> begin
-		sleep(self); @r self end
-	@rate(0.5)	~ self.state == awake && self.food > 3	=> begin
-		walk(self); @r self end
-	@rate(1.0) 	~ self.state == awake && self.food <= 3	=> begin
-		forage(self); @r self end
-	@rate(3.0)	~ self.state == awake && self.food > 1	=> begin
-		fallasleep(self); @r self end
-	@rate(-self.food * 2.0) ~ self.food < 0				=> begin
-		die(self); @kill self end
+	@rate(@sim().wake_rate)	~ agent.state == asleep			=> begin
+		wakeup(agent); @r agent end
+	@rate(1.0)	~ agent.state == asleep						=> begin
+		sleep(agent); @r agent end
+	@rate(0.5)	~ agent.state == awake && agent.food > 3	=> begin
+		walk(agent); @r agent end
+	@rate(1.0) 	~ agent.state == awake && agent.food <= 3	=> begin
+		forage(agent); @r agent end
+	@rate(3.0)	~ agent.state == awake && agent.food > 1	=> begin
+		fallasleep(agent); @r agent end
+	@rate(-agent.food * 2.0) ~ agent.food < 0				=> begin
+		die(agent); @kill agent end
 end
 
 @events m::Model begin
 	@debug
-	@repeat((1.0/(length(@sim().model.pop)+1)), 0.1) => begin
+	@repeat((1.0/(length(@sim().model.pop)+1)), 0.1) 		=> begin
 		if length(m.pop) < 10
 			push!(m.pop, A1(length(m.pop)))
 			spawn!(m.pop[end], @sim())
@@ -81,7 +81,7 @@ end
 @simulation Sim A1 Model begin
 	model :: Model
 	wake_rate :: Float64
-	end
+end
 
 function setup(sim)
 	spawn!(sim.model, sim)
