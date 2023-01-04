@@ -1,0 +1,12 @@
+name = "MiniEvents"
+uuid = "cc2f42a3-1295-4d24-93d2-d4f09bca1510"
+authors = ["Martin Hinsch <hinsch.martin@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+MacroTools = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
