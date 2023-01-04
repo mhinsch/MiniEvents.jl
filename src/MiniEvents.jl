@@ -5,7 +5,8 @@ using StaticArrays
 using Distributions
 using Reexport
 
-export @events, @simulation, refresh!, kill!, schedule!, spawn!, spawn_pop!, next_event!, now
+export @events, @simulation 
+export refresh!, kill!, schedule!, spawn!, spawn_pop!, next_event!, now
 
 
 include("EventLists.jl")
@@ -39,8 +40,6 @@ end
 function spawn!(a, s) 
 	scheduled_action!(a, s)
     EventLists.add_agent!(a, get_alist(s, typeof(a)), calc_rates(a, s))
-	# rates have changed => redraw waiting time
-	refresh_simulation!(s)
 end
 
 
@@ -49,8 +48,6 @@ function spawn_pop!(agents, s)
 		scheduled_action!(a, s)
 	    EventLists.add_agent!(a, get_alist(s, typeof(a)), calc_rates(a, s))
 	end
-	# rates have changed => redraw waiting time
-	refresh_simulation!(s)
 end
 
 

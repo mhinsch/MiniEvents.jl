@@ -50,13 +50,8 @@ end
 
 @generated now(sim) = :(time_now(sim.$(sched_mem_name(1))))
 
-"Reset waiting time."
-function refresh_simulation!(sim)
-	sim.t_next_evt  = now(sim)
-end
 
-
-function gen_next_in_dtime!(t_next_evt , sim, schedulers...)
+function gen_next_in_dtime_sched_fn(t_next_evt, sim, schedulers...)
 	t_expr = quote end
 	t_args = t_expr.args	
 	
@@ -79,6 +74,7 @@ function gen_next_in_dtime!(t_next_evt , sim, schedulers...)
 				# if this is the scheduler with the soonest event, run it
 				if min_next == $tname
 					next!(sched)
+					triggered = true
 				else
 				# otherwise just change the time
 					advance!(sched, min_next)
@@ -91,6 +87,7 @@ function gen_next_in_dtime!(t_next_evt , sim, schedulers...)
 	push!(min_args, :(t_next_evt))
 
 	quote
+		triggered = false
 		# current time
 		now = time_now(schedulers[1])
 		
@@ -102,34 +99,37 @@ function gen_next_in_dtime!(t_next_evt , sim, schedulers...)
 
 		# handle next scheduled event
 		$step_min
-		return min_next
+		return triggered
 	end |> MacroTools.flatten
 end
 
-@generated function next_in_dtime!(t_next_evt , sim, schedulers...)
-	gen_next_in_dtime!(t_next_evt , sim, schedulers...)
+@generated function next_in_dtime_sched!(t_next_evt, sim, schedulers...)
+	gen_next_in_dtime_sched_fn(t_next_evt, sim, schedulers...)
 end
 
 
-function next_event! end
+function next_in_dtime! end
 	
-function gen_next_event_fn(n_alists, n_schedulers)
-# *** waiting time
-	
-	# draw waiting time
-	draw_wait_time =  quote
-			sim.t_next_evt  = now(sim) + rand(Exponential(1.0/sum))
-			#println(sim.t_next_evt)
-		end 
-
-# *** check scheduled events
-	next_dt_call = :(next_in_dtime!(sim.t_next_evt , sim))
+"Generates overload to next_in_dtime! that only takes the sim object as argument."
+function gen_next_in_dtime_fn(n_schedulers)
+	next_dt_call = :(next_in_dtime_sched!(dt, sim))
 	ndc_args = next_dt_call.args
 	for i in 1:n_schedulers
 		sname = sched_mem_name(i)
 		push!(ndc_args, :(sim.$sname))
 	end
+	quote
+		function $(esc(:(MiniEvents.next_in_dtime!)))(dt, sim)
+			$next_dt_call
+		end
+	end
+end
+
+
+
+function next_event! end
 	
+function gen_next_event_fn(n_alists, n_schedulers)
 # *** select alist
 	# this part happens only if we have reached waiting time
 	sal_args = []
@@ -144,7 +144,8 @@ function gen_next_event_fn(n_alists, n_schedulers)
 		push!(sal_args, 
 			quote
 				if r <= $sname
-					return next_rate_event!(sim.$al_name, r, sim)
+					next_rate_event!(sim.$al_name, r, sim)
+					return true
 				end
 				r -= $sname
 			end)
@@ -155,26 +156,28 @@ function gen_next_event_fn(n_alists, n_schedulers)
 
 # *** put everything together
 	quote 
-		function $(esc(:(MiniEvents.next_event!)))(sim) 		
+		function $(esc(:(MiniEvents.next_event!)))(sim, max_t = Inf) 		
 			# calc sum of rates
 			$(gen_calc_sum_rates(n_alists))
 			# rate event has been triggered or rates been changes
-			if sim.t_next_evt <= now(sim)
-				$draw_wait_time
+			if sim.t_next_evt <= now(sim) || sum != sim.sum_rates
+				sim.t_next_evt  = now(sim) + rand(Exponential(1.0/sum))
 			end
+			sim.sum_rates = sum
 			# check if next scheduled event is earlier than waiting time
 			# if so execute it
-			$next_dt_call
+			# advance now to waiting time or earliest event
+			triggered = next_in_dtime!(min(max_t, sim.t_next_evt), sim)
 			# we are still not at waiting time, so 
 			# a scheduled event must have fired, do nothing
 			if sim.t_next_evt > now(sim)
-				print("$(sim.t_next_evt) ")
-				return nothing
+				#print("sim:$(sim.t_next_evt) ")
+				return triggered
 			end
-			# execute rate event
+			# now() == t_next_evt, so execute rate event
 			$select_alist
 			
-			nothing
+			true
 		end
 	end |> MacroTools.flatten
 end
@@ -202,12 +205,13 @@ macro simulation(name, args...)
     decl = :(mutable struct $name 
 		$(add_decls...)
 		t_next_evt  :: $(esc(:Float64))
+		sum_rates :: $(esc(:Float64))
 		end)
     members = decl.args[3].args
 	
 	# constructor and arguments
 	constr_decl_args = [gensym("arg") for x in rmlines(add_decls)]
-    constr_call_args = vcat(constr_decl_args, :(0.0))
+    constr_call_args = vcat(constr_decl_args, :(0.0), :(0.0))
 
 	get_alist_fns = []
 
@@ -239,6 +243,8 @@ macro simulation(name, args...)
 		push!(get_sched_fns, get_sched_fn) 
 	end
 
+	next_in_dtime_fn = gen_next_in_dtime_fn(length(types))
+
 	next_event_fn = gen_next_event_fn(length(types), length(types))
 
 	sched_fn = :(Scheduler.schedule!(fun, obj, at, sim::$(esc(name))) =
@@ -254,6 +260,8 @@ macro simulation(name, args...)
 
 		$(get_alist_fns...)
 		$(get_sched_fns...)
+
+		$next_in_dtime_fn
 
 		$sched_fn
 

@@ -1,6 +1,7 @@
 push!(LOAD_PATH, "./src")
 
 using MiniEvents
+using Random
 
 @enum AState asleep awake
 
@@ -73,7 +74,7 @@ end
 			spawn!(m.pop[end], @sim())
 			t = now(@sim())
 			println("$t: added agent")
-			@r m.pop[end] # redundant, just to see if it works
+#			@r m.pop[end] # redundant, just to see if it works
  		end
 	end
 end
@@ -87,15 +88,29 @@ function setup(sim)
 	spawn!(sim.model, sim)
 end
 
-function run(n, sim)
+function run_s(n, sim)
 	for i in 1:n
 		next_event!(sim)
+		println("time: ", now(sim))
 	end
-	println(now(sim))
 end
+
+function run_t(n, sim, dt)
+	for i in 1:n
+		t = now(sim) + dt
+		while next_event!(sim, t) end
+		println("time: ", now(sim))
+	end
+end
+
+Random.seed!(42)
 
 const simulation = Sim(Model(), 1.5)
 
 setup(simulation)
 
-run(10, simulation)
+println("dt:")
+run_t(10, simulation, 0.2)
+
+println("steps:")
+run_s(10, simulation)
