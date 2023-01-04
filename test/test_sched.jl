@@ -97,8 +97,7 @@ end
 
 function run_t(n, sim, dt)
 	for i in 1:n
-		t = now(sim) + dt
-		while next_event!(sim, t) end
+		step_time!(sim, dt)
 		println("time: ", now(sim))
 	end
 end
