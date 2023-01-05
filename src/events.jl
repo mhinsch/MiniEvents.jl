@@ -49,16 +49,25 @@ function gen_calc_rate_fn(decl, conds, rates)
     n = length(conds)
     VT = :(MiniEvents.VecType{$n, Float64})
 
+	calc = quote end
     con_call = :($VT())
-    for (c, r) in zip(conds, rates)
-        arg = :($c ? $r : 0.0)
-        push!(con_call.args, arg)
+	prev = :()
+
+    for (i, (c, r)) in enumerate(zip(conds, rates))
+		cur = Symbol("tmp_sum_$i")
+        sum_expr = i == 1 ? 
+			:($cur = $c ? $r : 0.0) :
+			:($cur = $prev + ($c ? $r : 0.0))
+		push!(calc.args, sum_expr)
+        push!(con_call.args, cur)
+		prev = cur
     end
 
 	sim_name = gensym("sim")
 
     quote $(esc(:( 
         function MiniEvents.calc_rates($decl, $sim_name) 
+            $(filter_sim(calc, sim_name))
             $(filter_sim(con_call, sim_name))
         end
 		)))
@@ -107,7 +116,7 @@ function gen_rate_event_fn(decl, actions, debug = false)
 
     for (i, a) in enumerate(actions)
 		act = filter_sim(filter_kills(filter_refreshs(a)), sim_name)
-        check = :(if (r -= rates[$i]) < 0
+        check = :(if r < rates[$i]
                       $(esc(act))
                       return
                   end)
@@ -143,7 +152,7 @@ function gen_rate_event_fn(decl, actions, debug = false)
 
             $check_actions
 
-            error("somthing went wrong!")
+            error("something went wrong ($r, $rates)!")
         end
     end
 end

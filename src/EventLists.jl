@@ -24,7 +24,7 @@ function EventList{AT, V}() where {AT, V}
 	EventList{AT, V}(Dict{AT, Int}(), Float64[], [], 0)
 end
 
-sum_rates(a::AgentEvents{AT, V}) where {AT, V} = sum(a.rates)
+sum_rates(a::AgentEvents{AT, V}) where {AT, V} = a.rates[end]
 sum_rates(al::EventList{AT,V}) where {AT, V} = isempty(al.sums) ? 0.0 : al.sums[1]
 
 
@@ -90,7 +90,7 @@ end
 function change_rates!(agent::T, alist::EventList{T, V}, rates::V) where {T,V}
 	idx = alist.indices[agent]
 	# change in rate
-	delta = sum(rates) - sum_rates(alist.events[idx])
+	delta = rates[end] - sum_rates(alist.events[idx])
 	alist.events[idx] = AgentEvents(agent, rates)
 	
 	if delta == 0
@@ -120,7 +120,7 @@ function add_delta!(sums, idx, delta)
 end
 
 function add_agent!(agent::T, alist::EventList{T, V}, rates::V) where {T,V}
-	new_sum = sum(rates)
+	new_sum = rates[end]
 	push!(alist.events, AgentEvents(agent, rates))
 	push!(alist.sums, new_sum)
 	alist.indices[agent] = length(alist.events)
