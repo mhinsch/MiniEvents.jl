@@ -35,7 +35,11 @@ parent(idx) = idx ÷ 2
 
 Base.haskey(el::EventList, agent) = haskey(el.indices, agent)
 
+const recalc_limit = 10000
 
+
+# TODO function of alist
+# TODO select action, return action index
 function lookup(sums, prob)
 	if isempty(sums) || prob > sums[1]
 		return 0, prob
@@ -93,11 +97,15 @@ function change_rates!(agent::T, alist::EventList{T, V}, rates::V) where {T,V}
 		return
 	end
 
-	if (alist.count += 1) > 10000
+	if (alist.count += 1) > recalc_limit
 		recalculate!(alist)
 		alist.count = 0
 	else
 		add_delta!(alist.sums, idx, delta)
+		if sum_rates(alist) < 0
+			println("recalc!")
+			recalculate!(alist)
+		end
 	end
 end
 
@@ -121,7 +129,7 @@ function add_agent!(agent::T, alist::EventList{T, V}, rates::V) where {T,V}
 		return
 	end
 
-	if (alist.count += 1) > 10000
+	if (alist.count += 1) > recalc_limit
 		recalculate!(alist)
 		alist.count = 0
 	else
@@ -145,9 +153,17 @@ function remove_agent!(agent, alist)
 	alist.indices[moved.agent] = idx
 	pop!(alist.indices, removed.agent)
 
-	add_delta!(alist.sums, idx, mv_sum - rmv_sum)
-	add_delta!(alist.sums, length(alist.sums), -mv_sum)
-	pop!(alist.sums)
+	if (alist.count += 1) > recalc_limit
+		pop!(alist.sums)
+		recalculate!(alist)
+		alist.count = 0
+	else
+		add_delta!(alist.sums, idx, mv_sum - rmv_sum)
+		add_delta!(alist.sums, length(alist.sums), -mv_sum)
+		pop!(alist.sums)
+	end
+	
+	@assert sum_rates(alist) >= 0
 end	
 
 

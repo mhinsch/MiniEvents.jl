@@ -22,6 +22,7 @@ include("simulation.jl")
 
 "Recalculate event rates for agents. Generic version for iterables of agents."
 function refresh!(agents, sim)
+	#println("RA: $(length(agents))")
 	# this is slightly less efficient than calling change_rates directly
 	# but this way heterogeneous collections are supported as well
 	for agent in agents
