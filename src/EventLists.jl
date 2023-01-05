@@ -17,11 +17,11 @@ mutable struct EventList{AT, V}
 	"All agents and their respective events."
 	events :: Vector{AgentEvents{AT, V}}
 	"Changes since last rate recalculation."
-	count :: Int
+	#count :: Int
 end
 
 function EventList{AT, V}() where {AT, V}
-	EventList{AT, V}(Dict{AT, Int}(), Float64[], [], 0)
+	EventList{AT, V}(Dict{AT, Int}(), Float64[], [])
 end
 
 sum_rates(a::AgentEvents{AT, V}) where {AT, V} = a.rates[end]
@@ -89,11 +89,15 @@ end
 
 function change_rates!(agent::T, alist::EventList{T, V}, rates::V) where {T,V}
 	idx = alist.indices[agent]
-	# change in rate
-	delta = rates[end] - sum_rates(alist.events[idx])
+	old_sum = sum_rates(alist.events[idx])	
 	alist.events[idx] = AgentEvents(agent, rates)
+	if rates[end] == old_sum
+		return
+	end
+
+	trickle_up!(alist, idx)
 	
-	if delta == 0
+#=	if delta == 0
 		return
 	end
 
@@ -106,7 +110,7 @@ function change_rates!(agent::T, alist::EventList{T, V}, rates::V) where {T,V}
 			println("recalc!")
 			recalculate!(alist)
 		end
-	end
+	end =#
 end
 
 function add_delta!(sums, idx, delta)
@@ -129,12 +133,14 @@ function add_agent!(agent::T, alist::EventList{T, V}, rates::V) where {T,V}
 		return
 	end
 
-	if (alist.count += 1) > recalc_limit
+	trickle_up!(alist, parent(length(alist.sums)))
+
+#=	if (alist.count += 1) > recalc_limit
 		recalculate!(alist)
 		alist.count = 0
 	else
 		add_delta!(alist.sums, parent(length(alist.sums)), new_sum)
-	end
+	end =#
 end
 
 # TODO add recalculate
@@ -153,7 +159,11 @@ function remove_agent!(agent, alist)
 	alist.indices[moved.agent] = idx
 	pop!(alist.indices, removed.agent)
 
-	if (alist.count += 1) > recalc_limit
+	idx2 = parent(length(alist.sums))
+	trickle_up!(alist, idx)
+	trickle_up!(alist, idx2)
+
+#=	if (alist.count += 1) > recalc_limit
 		pop!(alist.sums)
 		recalculate!(alist)
 		alist.count = 0
@@ -162,9 +172,30 @@ function remove_agent!(agent, alist)
 		add_delta!(alist.sums, length(alist.sums), -mv_sum)
 		pop!(alist.sums)
 	end
-	
+=#	
 	@assert sum_rates(alist) >= 0
 end	
+
+
+function update!(alist, idx)
+	l = left(idx)
+	sum_left = l <= length(alist.sums) ? alist.sums[l] : 0.0
+
+	r = right(idx)	
+	sum_right = r <= length(alist.sums) ? alist.sums[r] : 0.0
+	
+	alist.sums[idx] = sum_left + sum_right + sum_rates(alist.events[idx])
+end
+
+
+function trickle_up!(alist, idx)
+	update!(alist, idx)
+
+	while idx > 1
+		idx = parent(idx)
+		update!(alist, idx)
+	end
+end
 
 
 function recalculate!(alist)
