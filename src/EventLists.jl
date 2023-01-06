@@ -16,8 +16,6 @@ mutable struct EventList{AT, V}
 	sums :: Vector{Float64}
 	"All agents and their respective events."
 	events :: Vector{AgentEvents{AT, V}}
-	"Changes since last rate recalculation."
-	#count :: Int
 end
 
 function EventList{AT, V}() where {AT, V}
@@ -34,9 +32,6 @@ parent(idx) = idx ÷ 2
 
 
 Base.haskey(el::EventList, agent) = haskey(el.indices, agent)
-
-const recalc_limit = 10000
-
 
 # TODO function of alist
 # TODO select action, return action index
@@ -96,21 +91,6 @@ function change_rates!(agent::T, alist::EventList{T, V}, rates::V) where {T,V}
 	end
 
 	trickle_up!(alist, idx)
-	
-#=	if delta == 0
-		return
-	end
-
-	if (alist.count += 1) > recalc_limit
-		recalculate!(alist)
-		alist.count = 0
-	else
-		add_delta!(alist.sums, idx, delta)
-		if sum_rates(alist) < 0
-			println("recalc!")
-			recalculate!(alist)
-		end
-	end =#
 end
 
 function add_delta!(sums, idx, delta)
@@ -134,16 +114,9 @@ function add_agent!(agent::T, alist::EventList{T, V}, rates::V) where {T,V}
 	end
 
 	trickle_up!(alist, parent(length(alist.sums)))
-
-#=	if (alist.count += 1) > recalc_limit
-		recalculate!(alist)
-		alist.count = 0
-	else
-		add_delta!(alist.sums, parent(length(alist.sums)), new_sum)
-	end =#
 end
 
-# TODO add recalculate
+
 function remove_agent!(agent, alist)
 	idx = alist.indices[agent]
 
@@ -163,16 +136,6 @@ function remove_agent!(agent, alist)
 	trickle_up!(alist, idx)
 	trickle_up!(alist, idx2)
 
-#=	if (alist.count += 1) > recalc_limit
-		pop!(alist.sums)
-		recalculate!(alist)
-		alist.count = 0
-	else
-		add_delta!(alist.sums, idx, mv_sum - rmv_sum)
-		add_delta!(alist.sums, length(alist.sums), -mv_sum)
-		pop!(alist.sums)
-	end
-=#	
 	@assert sum_rates(alist) >= 0
 end	
 
