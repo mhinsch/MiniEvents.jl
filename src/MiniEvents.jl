@@ -6,7 +6,7 @@ using Distributions
 using Reexport
 
 export @events, @simulation 
-export refresh!, kill!, schedule!, spawn!, spawn_pop!, next_event!, step_time!, now
+export refresh!, kill!, schedule!, spawn!, spawn_pop!, next_event!, step_time!, step_until!, now
 
 
 include("EventLists.jl")
@@ -52,9 +52,13 @@ function spawn_pop!(agents, s)
 end
 
 
-function step_time!(sim, dt)
-	t = now(sim) + dt
+function step_until!(sim, t)
 	while next_event!(sim, t) end
+end
+
+
+function step_time!(sim, dt)
+	step_until!(now(sim) + dt)
 end
 
 end # MiniEvents.jl
