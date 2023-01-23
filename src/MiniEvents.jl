@@ -58,7 +58,7 @@ end
 
 
 function step_time!(sim, dt)
-	step_until!(now(sim) + dt)
+	step_until!(sim, now(sim) + dt)
 end
 
 end # MiniEvents.jl
