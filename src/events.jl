@@ -106,6 +106,20 @@ function filter_refreshs(actions)
 	end
 end
 
+"Replace @selected with selected item. Only valid within @rates_for."
+function filter_selnum(code, selnum_name)
+	MacroTools.postwalk(code) do x
+		@capture(x, @selnum()) ? selnum_name : x
+	end
+end	
+
+"Replace @selected with selected item. Only valid within @rates_for."
+function filter_sel(code, sel_name)
+	MacroTools.postwalk(code) do x
+		@capture(x, @selected()) ? sel_name : x
+	end
+end	
+
 "Trigger the next rate event for a type."
 function next_rate_event! end
 "Generate `next_rate_event!(alist)` for a single type, including all actions."
@@ -113,10 +127,13 @@ function gen_rate_event_fn(decl, actions, debug = false)
     check_actions = quote end
 
 	sim_name = gensym("sim")
+	selnum_name = gensym("selnum")
 
     for (i, a) in enumerate(actions)
-		act = filter_sim(filter_kills(filter_refreshs(a)), sim_name)
+		act = filter_selnum(filter_sim(filter_kills(filter_refreshs(a)), sim_name), selnum_name)
         check = :(if r < rates[$i]
+				      # TODO only add if @selnum is actually used
+				      $(esc(selnum_name)) = r - $(i>1 ? :(rates[$(i-1)]) : 0)
                       $(esc(act))
                       return
                   end)
@@ -224,6 +241,29 @@ function generate_events_code(decl, conds, rates, actions, sched_exprs, debug = 
 	res |> MacroTools.flatten
 end
 
+"Preprocess multi-rates."
+function process_rates_for(rate_f, iter, expr_act)
+	rate = :(sum($rate_f, $iter))
+	
+	sel = gensym("selected")
+	act = quote
+		s = @selnum()
+		$sel = nothing
+		for i in $iter
+			r = $rate_f(i)
+			if s < r
+				$sel = i
+				break
+			end
+			s -= r 
+		end
+		
+		$(filter_sel(expr_act, sel))
+	end
+			
+	rate, act
+end
+
 
 function parse_events(decl_agent, block)
 	block = rmlines(block)
@@ -246,6 +286,11 @@ function parse_events(decl_agent, block)
 			push!(rates, expr_rate)
 			push!(conds, expr_cond)
 			push!(actions, expr_act)
+		elseif @capture(line, @ratesfor(rate_fn_, iter_) ~ expr_cond_ => expr_act_)
+			r, a = process_rates_for(rate_fn, iter, expr_act)
+			push!(rates, r)
+			push!(conds, expr_cond)
+			push!(actions, a)
 		# these are for convenience only, more sophisticated scenarios have to be done
 		# manually using schedule!
 		elseif @capture(line, @repeat(expr_interval_, expr_start_) => expr_action_)
