@@ -293,6 +293,12 @@ function parse_events(decl_agent, block)
 			push!(actions, a)
 		# these are for convenience only, more sophisticated scenarios have to be done
 		# manually using schedule!
+		elseif @capture(line, @repeat(expr_interval_) => expr_action_)
+			if has_sched
+				error("only one schedule per type allowed")
+			end
+			sched_exprs = expr_interval, expr_interval, expr_action
+			has_sched = true
 		elseif @capture(line, @repeat(expr_interval_, expr_start_) => expr_action_)
 			if has_sched
 				error("only one schedule per type allowed")
