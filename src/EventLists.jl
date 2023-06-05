@@ -104,6 +104,8 @@ function add_delta!(sums, idx, delta)
 end
 
 function add_agent!(agent::T, alist::EventList{T, V}, rates::V) where {T,V}
+	if length(rates) < 1 return end
+		
 	new_sum = rates[end]
 	push!(alist.events, AgentEvents(agent, rates))
 	push!(alist.sums, new_sum)
