@@ -97,7 +97,7 @@ end
 
 function run_t(n, sim, dt)
 	for i in 1:n
-		step_time!(sim, dt)
+		step_dt!(sim, dt)
 		println("time: ", now(sim))
 	end
 end

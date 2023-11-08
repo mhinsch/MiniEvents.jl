@@ -6,7 +6,8 @@ using Distributions
 using Reexport
 
 export @events, @simulation 
-export refresh!, kill!, schedule!, spawn!, spawn_pop!, next_event!, step_time!, step_until!, now
+export refresh!, kill!, schedule!, spawn!, spawn_pop!, next_event!, step_dt!, step_until!, now
+export schedule_dt!
 
 
 include("EventLists.jl")
@@ -37,13 +38,13 @@ function kill!(agents, sim)
 	end
 end
 
-
+"Activate agent by adding its events to the scheduler."
 function spawn!(a, s) 
 	scheduled_action!(a, s)
     EventLists.add_agent!(a, get_alist(s, typeof(a)), calc_rates(a, s))
 end
 
-
+"Spawn an entire population of agents."
 function spawn_pop!(agents, s) 
 	for a in agents
 		scheduled_action!(a, s)
@@ -51,14 +52,17 @@ function spawn_pop!(agents, s)
 	end
 end
 
-
+"Process events until `now(sim) >= t`."
 function step_until!(sim, t)
 	while next_event!(sim, t) end
 end
 
-
-function step_time!(sim, dt)
+"Process events until time has increased by `dt`."
+function step_dt!(sim, dt)
 	step_until!(sim, now(sim) + dt)
 end
+
+"Schedule `fun(obj)` to be triggered at `now(sim) + dt`."
+schedule_dt!(fun, obj, dt, sim) = schedule!(fun, obj, now(sim)+dt, sim)
 
 end # MiniEvents.jl
