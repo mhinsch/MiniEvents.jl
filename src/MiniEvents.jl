@@ -62,6 +62,11 @@ function step_dt!(sim, dt)
 	step_until!(sim, now(sim) + dt)
 end
 
+"Schedule `fun(obj)` to be triggered at time `at`."
+@generated function schedule!(fun, obj, at, sim)
+	:(schedule_at!(fun, obj, at, get_scheduler(sim, $obj)))
+end
+
 "Schedule `fun(obj)` to be triggered at `now(sim) + dt`."
 schedule_dt!(fun, obj, dt, sim) = schedule!(fun, obj, now(sim)+dt, sim)
 

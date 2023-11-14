@@ -1,6 +1,6 @@
 module Scheduler
 
-export PQScheduler, isempty, schedule!, time_now, time_next, schedule_in!, next!, upto!, unschedule!, reset!, advance!
+export PQScheduler, isempty, schedule_at!, time_now, time_next, schedule_in!, next!, upto!, unschedule!, reset!, advance!
 
 
 using DataStructures
@@ -25,7 +25,7 @@ Base.isempty(scheduler::PQScheduler) = isempty(scheduler.queue)
 Base.haskey(scheduler::PQScheduler, obj) = haskey(scheduler.actions, obj)
 
 "Add a single item to the scheduler. Adds function `fun` to be called on `obj` at time `at` to `scheduler`."
-function schedule!(fun, obj, at, scheduler)
+function schedule_at!(fun, obj, at, scheduler)
 	scheduler.queue[obj] = at
 	scheduler.actions[obj] = fun
 #	println("<- ", at)
@@ -45,7 +45,7 @@ end
 "Add a single item (`fun` to be called on `obj`) at `wait` time from now to `scheduler`."
 function schedule_in!(fun, obj, wait, scheduler)
 	t = time_now(scheduler) + wait
-	schedule!(fun, obj, t, scheduler)
+	schedule_at!(fun, obj, t, scheduler)
 end
 
 

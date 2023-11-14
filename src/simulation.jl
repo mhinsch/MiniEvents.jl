@@ -13,7 +13,7 @@ function gen_get_alist_fn(ag_type, n)
 	))) end 
 end
 
-
+"Obtain the scheduler belonging to a specific agent type."
 function get_scheduler end
 "Generates `get_scheduler(sim, type)` for given type."
 function gen_get_scheduler_fn(ag_type, n)
@@ -48,19 +48,27 @@ function gen_calc_sum_rates(n_alists)
 end
 
 
+"Current time."
 @generated now(sim) = :(time_now(sim.$(sched_mem_name(1))))
 
 
 function gen_next_in_dtime_sched_fn(t_next_evt, sim, schedulers...)
+	# *** for each scheduler get the time of next event,
+	# *** find time of soonest event, then trigger that one and
+	# *** advance all others
+	
+	# time of next event per scheduler
 	t_expr = quote end
 	t_args = t_expr.args	
 	
+	# soonest of all events 
 	min_expr = :(min())
 	min_args = min_expr.args
-
+	
+	# trigger soonest event or advance time
 	step_min = quote end	
 	step_args = step_min.args
-
+	
 	for i in eachindex(schedulers)
 		tname = Symbol("t_$i")
 
@@ -71,7 +79,7 @@ function gen_next_in_dtime_sched_fn(t_next_evt, sim, schedulers...)
 		push!(step_min.args, 
 			quote
 				sched = schedulers[$i]
-				# if this is the scheduler with the soonest event, run it
+				# if this is (one of) the scheduler(s) with the soonest event, run it
 				if min_next == $tname
 					next!(sched)
 					triggered = true
@@ -82,7 +90,7 @@ function gen_next_in_dtime_sched_fn(t_next_evt, sim, schedulers...)
 			end)
 	end
 
-	# if check_next is sooner than the next scheduled event
+	# if t_next_evt is sooner than the next scheduled event
 	# we simply advance all schedulers
 	push!(min_args, :(t_next_evt))
 
@@ -103,6 +111,7 @@ function gen_next_in_dtime_sched_fn(t_next_evt, sim, schedulers...)
 	end |> MacroTools.flatten
 end
 
+"""Trigger next event with t<=t_next_evt. All schedulers are advanced to the time of that event or to t_next_evt otherwise."""
 @generated function next_in_dtime_sched!(t_next_evt, sim, schedulers...)
 	gen_next_in_dtime_sched_fn(t_next_evt, sim, schedulers...)
 end
@@ -114,12 +123,14 @@ function next_in_dtime! end
 function gen_next_in_dtime_fn(n_schedulers)
 	next_dt_call = :(next_in_dtime_sched!(dt, sim))
 	ndc_args = next_dt_call.args
+	# add schedulers to argument list
 	for i in 1:n_schedulers
 		sname = sched_mem_name(i)
 		push!(ndc_args, :(sim.$sname))
 	end
 	quote
 		function $(esc(:(MiniEvents.next_in_dtime!)))(dt, sim)
+			# call next_in_dtime_sched! with full list of schedulers
 			$next_dt_call
 		end
 	end
@@ -247,8 +258,8 @@ macro simulation(name, args...)
 
 	next_event_fn = gen_next_event_fn(length(types), length(types))
 
-	sched_fn = :(Scheduler.schedule!(fun, obj, at, sim::$(esc(name))) =
-		schedule!(fun, obj, at, get_scheduler(sim, typeof(obj))))
+	#sched_fn = :(Scheduler.schedule!(fun, obj, at, sim::$(esc(name))) =
+	#	schedule_at!(fun, obj, at, get_scheduler(sim, typeof(obj))))
 
     quote
         $decl
@@ -263,7 +274,7 @@ macro simulation(name, args...)
 
 		$next_in_dtime_fn
 
-		$sched_fn
+		#$sched_fn
 
 		$next_event_fn
     end |> MacroTools.flatten
