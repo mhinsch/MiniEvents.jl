@@ -125,20 +125,23 @@ function remove_agent!(agent, alist)
 	removed_idx = alist.indices[agent]
 
 	removed_evts = alist.events[removed_idx]
-	removed_sum = sum_rates(removed_evts)
+	removed_sumrates = sum_rates(removed_evts)
 
 	moved_evts = alist.events[end]
-	moved_sum = sum_rates(moved_evts)
+	moved_sumrates = sum_rates(moved_evts)
 
 	alist.events[removed_idx] = moved_evts
 	pop!(alist.events)
 
 	alist.indices[moved_evts.agent] = removed_idx
-	pop!(alist.indices, removed_evts.agent)
+	pop!(alist.indices, agent)
 
 	idx2 = parent(length(alist.sums))
 	pop!(alist.sums)
-	trickle_up!(alist, removed_idx)
+	# might have been the last agent that got removed
+	if removed_idx <= length(alist.sums)
+		trickle_up!(alist, removed_idx)
+	end
 	trickle_up!(alist, idx2)
 
 	@assert sum_rates(alist) >= 0
