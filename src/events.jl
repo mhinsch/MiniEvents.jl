@@ -280,7 +280,7 @@ function parse_events(decl_agent, block)
 	debug = false
 
 	for line in block.args
-        if @capture(line, @debug) || @capture(line, @debug_events)
+        if @capture(line, @debug) || @capture(line, @debugevents)
 			debug = true
 		elseif @capture(line, @rate(expr_rate_) ~ expr_cond_ => expr_act_)
 			push!(rates, expr_rate)

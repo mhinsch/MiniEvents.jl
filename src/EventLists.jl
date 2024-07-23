@@ -70,6 +70,8 @@ function lookup(sums, prob, idx)
 	if prob <= sum_all-sum_right
 		return idx, prob-sum_left
 	end
+	
+	@assert r <= length(sums)
 
 	# p            |
 	# all [..........]
@@ -120,22 +122,23 @@ end
 
 
 function remove_agent!(agent, alist)
-	idx = alist.indices[agent]
+	removed_idx = alist.indices[agent]
 
-	removed = alist.events[idx]
-	rmv_sum = sum_rates(removed)
+	removed_evts = alist.events[removed_idx]
+	removed_sum = sum_rates(removed_evts)
 
-	moved = alist.events[end]
-	mv_sum = sum_rates(moved)
+	moved_evts = alist.events[end]
+	moved_sum = sum_rates(moved_evts)
 
-	alist.events[idx] = moved
+	alist.events[removed_idx] = moved_evts
 	pop!(alist.events)
 
-	alist.indices[moved.agent] = idx
-	pop!(alist.indices, removed.agent)
+	alist.indices[moved_evts.agent] = removed_idx
+	pop!(alist.indices, removed_evts.agent)
 
 	idx2 = parent(length(alist.sums))
-	trickle_up!(alist, idx)
+	pop!(alist.sums)
+	trickle_up!(alist, removed_idx)
 	trickle_up!(alist, idx2)
 
 	@assert sum_rates(alist) >= 0
