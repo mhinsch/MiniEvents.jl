@@ -143,6 +143,53 @@ sum_all_real = sum(ae->ae.rates[end], sim.alist_1.events)
 
 @test sum_all_stored - sum_all_real < 0.00001
 
-
 end
 			
+
+mutable struct A4
+	state :: Int
+	r :: Float64
+end
+
+@events agent::A4 begin
+	@debug
+	@rate(agent.r)			~ true			=> begin
+		update1!(agent); @r agent end
+	@rate(100.0)		~ agent.state > 2		=> begin
+		child = A4(-1, 100.0)
+		push!(@sim().pop, child)
+		@spawn child
+		@r agent end
+end
+
+@simulation Sim4 A4 begin
+	pop :: Vector{A4}
+end
+
+@testset "agent addition" begin
+sim = Sim4([])
+for i in 1:10
+	push!(sim.pop, A4(0, 1.0 + rand()))
+	spawn!(sim.pop[end], sim)
+end
+
+# run until an agent gets born
+while true
+	next_event!(sim)
+	if any(a -> a.state == -1, sim.pop)
+		break
+	end
+end
+
+@test length(sim.alist_1.sums) == 11
+@test length(sim.alist_1.events) == 11
+@test any(ae -> ae.agent.state==-1, sim.alist_1.events)
+@test any(i -> i == 11, values(sim.alist_1.indices))
+
+sum_all_stored = sim.alist_1.sums[1]
+sum_all_real = sum(ae->ae.rates[end], sim.alist_1.events)
+
+@test sum_all_stored - sum_all_real < 0.00001
+
+
+end

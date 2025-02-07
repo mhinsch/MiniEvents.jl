@@ -74,6 +74,23 @@ function gen_calc_rate_fn(decl, conds, rates)
     end
 end
 
+"Replace @spawn with calls to spawn!."
+function filter_spawns(actions)
+	MacroTools.postwalk(actions) do x
+		if @capture(x, @spawn(args__))
+			ret = quote end
+			for arg in args
+				ex = :(spawn!($arg, @sim()))
+				push!(ret.args, ex)
+			end
+			ret
+		else
+			x
+		end
+	end
+end
+
+
 "Replace @kill with calls to kill!."
 function filter_kills(actions)
 	MacroTools.postwalk(actions) do x
@@ -130,7 +147,13 @@ function gen_rate_event_fn(decl, actions, debug = false)
 	selnum_name = gensym("selnum")
 
     for (i, a) in enumerate(actions)
-		act = filter_selnum(filter_sim(filter_kills(filter_refreshs(a)), sim_name), selnum_name)
+    	act = a |>
+    		filter_refreshs |>
+    		filter_kills |>
+    		filter_spawns |>
+    		x->filter_sim(x, sim_name) |>
+    		x->filter_selnum(x, selnum_name)
+		#act = filter_selnum(filter_sim(filter_kills(filter_refreshs(a)), sim_name), selnum_name)
         check = :(if r < rates[$i]
 				      # TODO only add if @selnum is actually used
 				      $(esc(selnum_name)) = r - $(i>1 ? :(rates[$(i-1)]) : 0)
