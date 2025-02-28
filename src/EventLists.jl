@@ -138,6 +138,12 @@ function remove_agent!(agent, alist)
 
 	idx2 = parent(length(alist.sums))
 	pop!(alist.sums)
+
+	# that's it, all agents are dead
+	if isempty(alist.sums)
+		return
+	end
+	
 	# might have been the last agent that got removed
 	if removed_idx <= length(alist.sums)
 		trickle_up!(alist, removed_idx)
@@ -145,6 +151,7 @@ function remove_agent!(agent, alist)
 	trickle_up!(alist, idx2)
 
 	@assert sum_rates(alist) >= 0
+	nothing
 end	
 
 
