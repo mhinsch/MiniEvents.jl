@@ -1,5 +1,7 @@
 
-"Return number of events defined for a given agent type."
+"""
+Return number of events defined for a given agent type.
+"""
 function event_count end
 "Generates `event_count(type)` for given type."
 function gen_event_count_fn(decl, n)
@@ -9,7 +11,9 @@ function gen_event_count_fn(decl, n)
 	))) end 
 end
 
-"Generates `refresh!(agent, alist)` for given type."
+"""
+Generates `refresh!(agent, alist)` for given type.
+"""
 function gen_refresh_fn(decl)
     ag_type = decl.args[2]
 	quote $(esc(:(
@@ -18,7 +22,9 @@ function gen_refresh_fn(decl)
 	))) end 
 end
 
-"Generates `kill!(agent, alist)` for given type."
+"""
+Generates `kill!(agent, alist)` for given type.
+"""
 function gen_kill_fn(decl)
     ag_type = decl.args[2]
 	quote $(esc(:(
@@ -342,7 +348,14 @@ function parse_events(decl_agent, block)
 	generate_events_code(decl_agent, conds, rates, actions, sched_exprs, debug)
 end
 
+"""
+```Julia
+@events(decl_agent, block)
+```
 
+Parse `block` to generate event code using agent declaration `decl_agent`.
+
+"""
 macro events(decl_agent, block)
 	parse_events(decl_agent, block)
 end

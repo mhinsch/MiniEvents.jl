@@ -1,5 +1,7 @@
 module EventLists
 
+using DocStringExtensions
+
 export AgentEvents, EventList, lookup, change_rates!, add_agent!, remove_agent!
 
 "Single agent and the rates of all actions it can do."
@@ -18,11 +20,26 @@ mutable struct EventList{AT, V}
 	events :: Vector{AgentEvents{AT, V}}
 end
 
+"""
+$(SIGNATURES)
+
+Generate an empty `EventList`.
+"""
 function EventList{AT, V}() where {AT, V}
 	EventList{AT, V}(Dict{AT, Int}(), Float64[], [])
 end
 
+"""
+$(TYPEDSIGNATURES)
+
+Calculate the sum of all rates assigned to a single agent type.
+"""
 sum_rates(a::AgentEvents{AT, V}) where {AT, V} = a.rates[end]
+"""
+$(TYPEDSIGNATURES)
+
+Calculate the sum of all rates assigned to an entire population of agents.
+"""
 sum_rates(al::EventList{AT,V}) where {AT, V} = isempty(al.sums) ? 0.0 : al.sums[1]
 
 
@@ -84,6 +101,11 @@ function lookup(sums, prob, idx)
 	lookup(sums, prob - sum_all + sum_right, r)
 end
 
+"""
+$(TYPEDSIGNATURES)
+
+Change rates associated with agent object `agent`.
+"""
 function change_rates!(agent::T, alist::EventList{T, V}, rates::V) where {T,V}
 	idx = alist.indices[agent]
 	old_sum = sum_rates(alist.events[idx])	
@@ -105,6 +127,11 @@ function add_delta!(sums, idx, delta)
 	add_delta!(sums, parent(idx), delta)
 end
 
+"""
+$(TYPEDSIGNATURES)
+
+Add a new agent to the eventlist.
+"""
 function add_agent!(agent::T, alist::EventList{T, V}, rates::V) where {T,V}
 	if length(rates) < 1 return end
 		
@@ -120,7 +147,11 @@ function add_agent!(agent::T, alist::EventList{T, V}, rates::V) where {T,V}
 	trickle_up!(alist, parent(length(alist.sums)))
 end
 
+"""
+$(SIGNATURES)
 
+Remove an agent from the event list.
+"""
 function remove_agent!(agent, alist)
 	removed_idx = alist.indices[agent]
 

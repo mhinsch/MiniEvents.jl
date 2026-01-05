@@ -48,7 +48,11 @@ function gen_calc_sum_rates(n_alists)
 end
 
 
-"Current time."
+"""
+$(SIGNATURES)
+
+Current time in simulation `sim`.
+"""
 @generated now(sim) = :(time_now(sim.$(sched_mem_name(1))))
 
 
@@ -137,7 +141,13 @@ function gen_next_in_dtime_fn(n_schedulers)
 end
 
 
+"""
+```Julia
+next_event(sim)
+```
 
+Find and execute the next event in `sim`.
+"""
 function next_event! end
 	
 function gen_next_event_fn(n_alists, n_schedulers)
@@ -196,6 +206,17 @@ end
 const sim_syntax_error =
 	"expected: @simulation <name> <type> [ <type>...] [ <declarations> ]"
 
+"""
+```Julia
+@simulation(name, args...)
+```
+
+Generate a simulation type named `name`. `args` is a list of agent types that can be
+subject to events (as declared with `@events`). As an optional last parameter a declaration block can
+be provided. This block will be included verbatim in the declaration of `struct <name>` and be used
+to store global information that needs to be accessible from inside of event code (via the `@sim`
+pseudo macro), such as for example parameters or global system state.
+"""
 macro simulation(name, args...)
 
 	@assert length(args)>0 sim_syntax_error

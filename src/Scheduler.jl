@@ -5,6 +5,7 @@ export PQScheduler, isempty, schedule_at!, time_now, time_next, schedule_in!, ne
 
 using DataStructures
 
+using DocStringExtensions
 
 "A simple scheduler based on PriorityQueue."
 mutable struct PQScheduler{TIME, OBJ}
@@ -19,37 +20,65 @@ PQScheduler{TIME, OBJ}() where {TIME, OBJ} = PQScheduler{TIME, OBJ}(
 
 time_type(sched::PQScheduler{TIME, OBJ}) where {TIME, OBJ} = TIME
 
-"Returns true if the scheduler does not contain any actions."
+"""
+$(SIGNATURES)
+
+Returns true if the scheduler does not contain any actions.
+"""
 Base.isempty(scheduler::PQScheduler) = isempty(scheduler.queue)
 
 Base.haskey(scheduler::PQScheduler, obj) = haskey(scheduler.actions, obj)
 
-"Add a single item to the scheduler. Adds function `fun` to be called on `obj` at time `at` to `scheduler`."
+"""
+$(SIGNATURES)
+
+Add a single item to the scheduler. Adds function `fun` to be called on `obj` at time `at` to `scheduler`.
+"""
 function schedule_at!(fun, obj, at, scheduler)
 	scheduler.queue[obj] = at
 	scheduler.actions[obj] = fun
 #	println("<- ", at)
 end
 
-"Time stamp of the last action that was executed by `scheduler`."
+"""
+$(SIGNATURES)
+
+Time stamp of the last action that was executed by `scheduler`.
+"""
 time_now(scheduler) = scheduler.now
 
-"Time stamp of the next action to be executed by `scheduler` or `time_now` if it is empty."
+"""
+$(SIGNATURES)
+
+Time stamp of the next action to be executed by `scheduler` or `time_now` if it is empty.
+"""
 time_next(scheduler) = isempty(scheduler) ? time_type(scheduler)(Inf) : peek(scheduler.queue)[2]
 
-"Advance time to `t`. Caution, this does not check for consistency!"
+"""
+$(SIGNATURES)
+
+Advance time to `t`. Caution, this does not check for consistency!
+"""
 function advance!(scheduler, t)
 	scheduler.now = t
 end
 
-"Add a single item (`fun` to be called on `obj`) at `wait` time from now to `scheduler`."
+"""
+$(SIGNATURES)
+
+Add a single item (`fun` to be called on `obj`) at `wait` time from now to `scheduler`.
+"""
 function schedule_in!(fun, obj, wait, scheduler)
 	t = time_now(scheduler) + wait
 	schedule_at!(fun, obj, t, scheduler)
 end
 
 
-"Run the next action in `scheduler` or do nothing if empty. Returns the action's return value."
+"""
+$(SIGNATURES)
+
+Run the next action in `scheduler` or do nothing if empty. Returns the action's return value.
+"""
 function next!(scheduler)
 #	println("! ", scheduler.now)
 
@@ -68,7 +97,11 @@ end
 
 # we could implement this using repeated calls to next but that
 # would require redundant calls to peek
-"Run actions in `scheduler` up to time `atime`. Returns the scheduler."
+"""
+$(SIGNATURES)
+
+Run actions in `scheduler` up to time `atime`. Returns the scheduler.
+"""
 function upto!(scheduler, atime)
 #	println("! ", scheduler.now, " ... ", time)
 
@@ -90,13 +123,21 @@ function upto!(scheduler, atime)
 	scheduler
 end
 
-"Remove action for `obj` from `scheduler`."
+"""
+$(SIGNATURES)
+
+Remove action for `obj` from `scheduler`.
+"""
 function unschedule!(scheduler, obj)
 	delete!(scheduler.queue, obj)
 	delete!(scheduler.actions, obj)
 end
 
-"Remove all actions from `scheduler` and reset time to 0."
+"""
+$(SIGNATURES)
+
+Remove all actions from `scheduler` and reset time to 0.
+"""
 function reset!(scheduler)
 	empty!(scheduler.actions)
 	empty!(scheduler.queue)
@@ -107,6 +148,7 @@ end
 # *** alternative, simpler implementation
 # this is actually substantially slower with more memory allocation
 
+#=
 mutable struct PQScheduler2{TIME}
 	queue :: PriorityQueue{Any, Tuple{TIME, Function}}
 	now :: TIME
@@ -173,4 +215,5 @@ function reset!(scheduler::PQScheduler2{T}) where{T}
 	empty!(scheduler.queue)
 	scheduler.time = typeof(scheduler.time)(0)
 end
+=#
 end
