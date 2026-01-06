@@ -1,8 +1,6 @@
 include("../src/MiniEvents.jl")
 using .MiniEvents
 
-include("../src/EventLists.jl")
-using .EventLists
 
 using Test
 
