@@ -353,7 +353,77 @@ end
 @events(decl_agent, block)
 ```
 
-Parse `block` to generate event code using agent declaration `decl_agent`.
+Parse `block` to generate event code using agent declaration `decl_agent` (where `decl_agent` has the format `<name> :: <type>`).
+
+`block` has to consist of a list of event declaration and directives (in no particular order). 
+
+# Directives
+
+## `@debug`
+
+Emits code that compares the current value of an object's rates with the stored values. This is especially useful to catch cases where a required refresh (see below) was emitted.
+
+# Event declarations
+
+MiniEvents provides basic support for deterministic scheduling with `@repeat` and `@at`. Note that only *one* of these event types can occur per event declaration. In addition any number of stochastic events can be declared using `@rate` or `@ratesfor`.
+
+## `@repeat`
+
+```
+@repeat(interval) => action
+```
+Repeat `action` every `interval` time units.
+```@repeat(interval, start) => action```
+Repeat `action` every `interval` time units, starting at `start`.
+
+## `@at`
+
+```
+@at(start) => action
+```
+Run `action` exactly once at `start`. Note that future actions have to be scheduled manually. 
+
+## `@rate`
+
+```
+@rate(rate) ~ condition => action
+```
+If `condition` is met perform `action` at rate `rate`. Note that rates and conditions are evaluated at the point of scheduling and need to be refreshed manually if the agent object's state changes (see below).
+
+## `@ratesfor`
+
+```
+@ratesfor(function, iterator) ~ condition => action
+```
+This allows for the efficient scheduling of an event whose rate is the sum of a number of individual rates when it is important to know which particular individual rate was triggered. For example infection rate of an individual could depend on the number of its contacts, but in some cases we want to know *which* contact was the source of infection.
+
+# Scheduling
+
+The following pseudo macros are used to control scheduling. They generally take one or several arguments (each of which can be an iterable). They can only be used in action blocks.
+
+## `@r`
+
+Refresh an object. This updates the rate and condition. Objects without a rate event can't be refreshed.
+
+## `@kill`
+
+Remove an object from scheduling.
+
+## `@spawn`
+
+Add a new object to scheduling.
+
+# Information
+
+These macros provide access to some internal state of the scheduler and take no arguments. They can only be used in action blocks.
+
+## `@sim`
+
+Access the sim object.
+
+## `@selected`
+
+The selected item in `@ratesfor`. 
 
 """
 macro events(decl_agent, block)
