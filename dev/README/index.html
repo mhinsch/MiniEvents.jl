@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Introduction · MiniEvents.jl</title><meta name="title" content="Introduction · MiniEvents.jl"/><meta property="og:title" content="Introduction · MiniEvents.jl"/><meta property="twitter:title" content="Introduction · MiniEvents.jl"/><meta name="description" content="Documentation for MiniEvents.jl."/><meta property="og:description" content="Documentation for MiniEvents.jl."/><meta property="twitter:description" content="Documentation for MiniEvents.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href>MiniEvents.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li class="is-active"><a class="tocitem" href>Introduction</a><ul class="internal"><li><a class="tocitem" href="#Simple-example"><span>Simple example</span></a></li><li><a class="tocitem" href="#More-advanced-example"><span>More advanced example</span></a></li></ul></li><li><a class="tocitem" href="../eventlists/">EventLists</a></li><li><a class="tocitem" href="../scheduler/">Scheduler</a></li><li><a class="tocitem" href="../minievents/">MiniEvents</a></li><li><a class="tocitem" href="../">Index</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Introduction</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Introduction</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/mhinsch/MiniEvents.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/mhinsch/MiniEvents.jl/blob/main/docs/src/README.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="MiniEvents.jl"><a class="docs-heading-anchor" href="#MiniEvents.jl">MiniEvents.jl</a><a id="MiniEvents.jl-1"></a><a class="docs-heading-anchor-permalink" href="#MiniEvents.jl" title="Permalink"></a></h1><p>Minimalistic event based simulation package.</p><p>MiniEvents provides a simple macro interface to describe continuous time, discrete events simulations. It uses an efficient simulation algorithm (<a href="https://www.jasss.org/27/1/10.html">Köster et al., 2024</a>), so that even agent-based models with tens of thousands of agents can easily be handled. It also supports the simultaneous use of different agent types as well as deterministic events and doesn&#39;t require any special considerations in the simulation code itself.</p><h2 id="Simple-example"><a class="docs-heading-anchor" href="#Simple-example">Simple example</a><a id="Simple-example-1"></a><a class="docs-heading-anchor-permalink" href="#Simple-example" title="Permalink"></a></h2><p>As an example let&#39;s implement a simple SI model.</p><p>We will start by defining the model without thinking about events or scheduling:</p><pre><code class="language-Julia hljs">@enum Status susceptible infected
+
+mutable struct Person
+    status :: Status
+    contacts :: Vector{Person}
+end
+
+Person() = Person(susceptible, [])
+
+infect!(person) = (person.status = infected)
+heal!(person) = (person.status = susceptible)</code></pre><p>At this point we have the basic workings of a model. Note that this is basically the same implementation we would use if we wanted to use step-wise updates.</p><p>To set up our event-based simulation we have to define events:</p><pre><code class="language-Julia hljs">
+@events person::Person begin
+    # this is optional, it checks if activated objects have changed state since the last activation
+    @debug
+
+    @rate(count(p-&gt;p.status == infected, person.contacts) * 1e-6) ~
+        # this is a boolean condition that determines whether the event can take place
+        person.status == susceptible =&gt;
+        begin
+            infect!(person)
+            # all objects whose event rates are affected need to be refreshed
+            @r person, person.contacts
+        end
+
+    @rate(1e-2) ~
+        person.status == infected =&gt;
+        begin
+            heal!(person)
+            @r person person.contacts
+        end
+end</code></pre><p>Now we need to create the main simulation object that will contain the necessary state of the simulator.</p><pre><code class="language-Julia hljs"># the simulation object has to be told about every type that has events associated with it
+@simulation Sim Person</code></pre><p>This will provide all the machinery of the simulation, but to make this a usable simulation model we will have to add a bit more infrastructure:</p><pre><code class="language-Julia hljs">mutable struct Model
+    pop :: Vector{Person}
+    sim :: Sim
+end
+
+function step!(model)
+    # find and execute the next event in line
+    next_event!(model.sim)
+end
+
+function spawn!(model)
+    # before an object can receive events it needs to be activated
+    # spawn_pop! activates a list of objects at once
+    spawn_pop!(model.pop, model.sim)
+end</code></pre><p>Everything else that would be needed for a working simulation (e.g. setup, output) can be implemented in exactly the same way as it would for step-wise updating.</p><h2 id="More-advanced-example"><a class="docs-heading-anchor" href="#More-advanced-example">More advanced example</a><a id="More-advanced-example-1"></a><a class="docs-heading-anchor-permalink" href="#More-advanced-example" title="Permalink"></a></h2><p>We can improve this example with a few convenience features. <code>@simulation</code> supports adding custom properties to the generated simulation type. This way we don&#39;t have to keep track of separate simulation and model objects and we can also easily add parameters. So, given these definitions:</p><pre><code class="language-Julia hljs">struct World
+    pop :: Vector{Person}
+end
+
+
+@kwdef struct Params
+	r_inf :: Float64 = 1e-6
+	r_rec :: Float64 = 1e-2
+	t_inf :: Float64 = 1.0
+end</code></pre><p>we can now define our simulation like this:</p><pre><code class="language-Julia hljs">@simulation Model Person World begin
+	world :: World
+	pars :: Params
+end</code></pre><p>Then we can replace our hard-coded rates in the event definition:</p><pre><code class="language-Julia hljs">@events person::Person begin
+    # this is optional, it checks if activated objects have changed state since the last activation
+    @debug
+
+    @rate(count(p-&gt;p.status == infected, person.contacts) * @sim().pars.r_inf) ~
+        # this is a boolean condition that determines whether the event can take place
+        person.status == susceptible =&gt;
+        begin
+            infect!(person)
+            # all objects whose event rates are affected need to be refreshed
+            @r person, person.contacts
+        end
+
+    @rate(@sim().pars.r_rec) ~
+        person.status == infected =&gt;
+        begin
+            heal!(person)
+            @r person person.contacts
+        end
+end</code></pre><p>Note that the pseudo macro <code>@sim</code> gives us access to the simulation object.</p><p>While we are at it we can now also define events for <code>World</code>:</p><pre><code class="language-Julia hljs">@events world::World begin
+	@debug
+
+	@repeat(@sim().pars.t_inf) =&gt;
+	begin
+		p = rand(world.pop)
+		p.status = infected
+		@r p
+	end
+end</code></pre><p>Just for the sake of demonstration we are using a different event type in this case - <code>@repeat</code> triggers events at exact time points instead of stochastically. This means we also don&#39;t have to refresh the world&#39;s rate with <code>@r</code> (we do have to refresh the agent we are changing, though).</p><p>With all this in place we can define our step and spawn methods. Since <code>Model</code> is now our simulation type there is no need any more to refer to <code>model.sim</code> separately.</p><pre><code class="language-Julia hljs">function step!(model)
+    # find and execute the next event in line
+    next_event!(model)
+end
+
+function MiniEvents.spawn!(model::Model)
+    # before an object can receive events it needs to be activated
+    # spawn_pop! activates a list of objects at once
+    spawn_pop!(model.world.pop, model)
+    spawn!(model.world, model)
+end</code></pre></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="../eventlists/">EventLists »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Tuesday 6 January 2026 12:05">Tuesday 6 January 2026</span>. Using Julia version 1.12.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
