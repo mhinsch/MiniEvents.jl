@@ -15,3 +15,4 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 [compat]
 DocStringExtensions = "0.9.5"
 MacroTools = "0.5"
+DataStructures = "0.19"
