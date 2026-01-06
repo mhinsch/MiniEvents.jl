@@ -1,6 +1,6 @@
 # MiniEvents.jl
 
-[![CI](https://github.com/mhinsch/MiniObserve.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/mhinsch/MiniObserve.jl/actions/workflows/ci.yml)[![](https://img.shields.io/badge/docs-stable-blue.svg)](http://mhinsch.github.io/MiniEvents.jl/dev/README)
+[![CI](https://github.com/mhinsch/MiniEvents.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/mhinsch/MiniEvents.jl/actions/workflows/ci.yml)[![](https://img.shields.io/badge/docs-stable-blue.svg)](http://mhinsch.github.io/MiniEvents.jl/dev/README)
 
 Minimalistic event based simulation package.
 
