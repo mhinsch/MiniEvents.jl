@@ -1,4 +1,7 @@
 # MiniEvents.jl
+
+[![](https://img.shields.io/badge/docs-stable-blue.svg)](http://mhinsch.github.io/MiniEvents.jl/dev/README)
+
 Minimalistic event based simulation package.
 
 MiniEvents provides a simple macro interface to describe continuous time, discrete events simulations. It uses an efficient simulation algorithm ([Köster et al., 2024](https://www.jasss.org/27/1/10.html)), so that even agent-based models with tens of thousands of agents can easily be handled. It also supports the simultaneous use of different agent types as well as deterministic events and doesn't require any special considerations in the simulation code itself.
