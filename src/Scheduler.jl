@@ -52,7 +52,7 @@ $(SIGNATURES)
 
 Time stamp of the next action to be executed by `scheduler` or `time_now` if it is empty.
 """
-time_next(scheduler) = isempty(scheduler) ? time_type(scheduler)(Inf) : first(scheduler.queue)[2]
+time_next(scheduler) = isempty(scheduler) ? time_type(scheduler)(Inf) : peek(scheduler.queue)[2]
 
 """
 $(SIGNATURES)
@@ -86,10 +86,10 @@ function next!(scheduler)
 		return
 	end
 
-	obj, time = first(scheduler.queue)
+	obj, time = peek(scheduler.queue)
 
 	scheduler.now = time
-	popfirst!(scheduler.queue)
+	dequeue!(scheduler.queue)
 	fun = scheduler.actions[obj]
 	delete!(scheduler.actions, obj)
 	fun(obj)
@@ -106,7 +106,7 @@ function upto!(scheduler, atime)
 #	println("! ", scheduler.now, " ... ", time)
 
 	while !isempty(scheduler)
-		obj, time = first(scheduler.queue)
+		obj, time = peek(scheduler.queue)
 
 		if time > atime
 			scheduler.now = atime
@@ -114,7 +114,7 @@ function upto!(scheduler, atime)
 		end
 
 		scheduler.now = time
-		popfirst!(scheduler.queue)
+		dequeue!(scheduler.queue)
 		fun = scheduler.actions[obj]
 		delete!(scheduler.actions, obj)
 		fun(obj)
@@ -167,7 +167,7 @@ function schedule!(fun, obj, at, scheduler::PQScheduler2{T}) where{T}
 end
 
 
-time_next(scheduler::PQScheduler2{T}) where{T} = isempty(scheduler) ? scheduler.now : first(scheduler.queue)[2][1]
+time_next(scheduler::PQScheduler2{T}) where{T} = isempty(scheduler) ? scheduler.now : peek(scheduler.queue)[2][1]
 
 
 "run the next action"
@@ -178,10 +178,10 @@ function next!(scheduler::PQScheduler2{T}) where{T}
 		return
 	end
 
-	obj, (time, fun) = first(scheduler.queue)
+	obj, (time, fun) = peek(scheduler.queue)
 
 	scheduler.now = time
-	popfirst!(scheduler.queue)
+	dequeue!(scheduler.queue)
 	fun(obj)
 end
 
@@ -192,7 +192,7 @@ function upto!(scheduler::PQScheduler2{T}, atime) where{T}
 #	println("! ", scheduler.now, " ... ", time)
 
 	while !isempty(scheduler)
-		obj, (time, fun) = first(scheduler.queue)
+		obj, (time, fun) = peek(scheduler.queue)
 
 		if time > atime
 			scheduler.now = atime
@@ -200,7 +200,7 @@ function upto!(scheduler::PQScheduler2{T}, atime) where{T}
 		end
 
 		scheduler.now = time
-		popfirst!(scheduler.queue)
+		dequeue!(scheduler.queue)
 		fun(obj)
 	end
 
