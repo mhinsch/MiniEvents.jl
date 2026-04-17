@@ -139,9 +139,9 @@ end
 "Replace @selected with selected item. Only valid within @rates_for."
 function filter_sel(code, sel_name, sel_idx_name)
 	MacroTools.postwalk(code) do x
-		x2 = @capture(x, @selected()) ? sel_name : x
-		# avoid union bug in macrotools
-		@capture(x2, @selected_idx()) ? sel_idx_name : x2
+		@capture(x, @selected()) ? sel_name : 
+			# avoid union bug in macrotools
+			(@capture(x, @selected_idx()) ? sel_idx_name : x)
 	end
 end	
 
