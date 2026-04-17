@@ -139,9 +139,8 @@ end
 "Replace @selected with selected item. Only valid within @rates_for."
 function filter_sel(code, sel_name, sel_idx_name)
 	MacroTools.postwalk(code) do x
-		@capture(x, @selected()) ? sel_name : 
-			# avoid union bug in macrotools
-			(@capture(x, @selected_idx()) ? sel_idx_name : x)
+		@capture(x, @selectedidx()) ? sel_idx_name : 
+			(@capture(x, @selected()) ? sel_name : x)
 	end
 end	
 
@@ -346,7 +345,7 @@ function parse_events(decl_agent, block)
 			sched_exprs = expr_interval, expr_start, expr_action
 			has_sched = true
 		else
-			error("Event declarations expected: @event(<RATE>) ~ <COND> => <ACTION>")	
+			error("Directives or event declarations expected, e.g.: @event(<RATE>) ~ <COND> => <ACTION>")	
 		end
 	end
 	
@@ -404,7 +403,7 @@ If `condition` is met perform `action` at rate `rate`. Note that rates and condi
 ```
 @ratesfor(function, iterator) ~ condition => action
 ```
-This allows for the efficient scheduling of an event whose rate is the sum of a number of individual rates when it is important to know which particular individual rate was triggered. For example infection rate of an individual could depend on the number of its contacts, but in some cases we want to know *which* contact was the source of infection (accessible with `@selected`).
+This allows for the efficient scheduling of an event whose rate is the sum of a number of individual rates when it is important to know which particular individual rate was triggered. For example infection rate of an individual could depend on the number of its contacts, but in some cases we want to know *which* contact was the source of infection (accessible with `@selected` and `@selectedidx`).
 
 # Scheduling
 
@@ -430,9 +429,9 @@ These macros provide access to some internal state of the scheduler and take no 
 
 Access the sim object.
 
-## `@selected`
+## `@selected`, `@selectedidx`
 
-The selected item in `@ratesfor`. 
+The selected item and its index in `@ratesfor`. 
 
 """
 macro events(decl_agent, block)
