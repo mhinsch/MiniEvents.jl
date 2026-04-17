@@ -282,7 +282,7 @@ function process_rates_for(rate_f, iter, expr_act)
 		s = @selnum()
 		$sel = nothing
 		$sel_idx = nothing
-		for (idx, i) in $iter
+		for (idx, i) in enumerate($iter)
 			r = $rate_f(i)
 			if s < r
 				$sel = i
@@ -292,7 +292,7 @@ function process_rates_for(rate_f, iter, expr_act)
 			s -= r 
 		end
 		
-		$(filter_sel(expr_act, sel))
+		$(filter_sel(expr_act, sel, sel_idx))
 	end
 			
 	rate, act
