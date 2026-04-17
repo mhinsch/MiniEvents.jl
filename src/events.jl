@@ -373,7 +373,11 @@ MiniEvents provides basic support for deterministic scheduling with `@repeat` an
 @repeat(interval) => action
 ```
 Repeat `action` every `interval` time units.
-```@repeat(interval, start) => action```
+
+```
+@repeat(interval, start) => action
+```
+
 Repeat `action` every `interval` time units, starting at `start`.
 
 ## `@at`
@@ -395,7 +399,7 @@ If `condition` is met perform `action` at rate `rate`. Note that rates and condi
 ```
 @ratesfor(function, iterator) ~ condition => action
 ```
-This allows for the efficient scheduling of an event whose rate is the sum of a number of individual rates when it is important to know which particular individual rate was triggered. For example infection rate of an individual could depend on the number of its contacts, but in some cases we want to know *which* contact was the source of infection.
+This allows for the efficient scheduling of an event whose rate is the sum of a number of individual rates when it is important to know which particular individual rate was triggered. For example infection rate of an individual could depend on the number of its contacts, but in some cases we want to know *which* contact was the source of infection (accessible with `@selected`).
 
 # Scheduling
 
