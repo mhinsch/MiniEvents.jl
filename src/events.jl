@@ -137,9 +137,11 @@ function filter_selnum(code, selnum_name)
 end	
 
 "Replace @selected with selected item. Only valid within @rates_for."
-function filter_sel(code, sel_name)
+function filter_sel(code, sel_name, sel_idx_name)
 	MacroTools.postwalk(code) do x
-		@capture(x, @selected()) ? sel_name : x
+		x2 = @capture(x, @selected()) ? sel_name : x
+		# avoid union bug in macrotools
+		@capture(x2, @selected_idx()) ? sel_idx_name : x2
 	end
 end	
 
@@ -275,13 +277,16 @@ function process_rates_for(rate_f, iter, expr_act)
 	rate = :(sum($rate_f, $iter))
 	
 	sel = gensym("selected")
+	sel_idx = gensym("selected_idx")
 	act = quote
 		s = @selnum()
 		$sel = nothing
-		for i in $iter
+		$sel_idx = nothing
+		for (idx, i) in $iter
 			r = $rate_f(i)
 			if s < r
 				$sel = i
+				$sel_idx = idx
 				break
 			end
 			s -= r 
