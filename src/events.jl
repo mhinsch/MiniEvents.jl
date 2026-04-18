@@ -173,13 +173,13 @@ function gen_rate_event_fn(decl, actions, debug = false)
     l_type = :(MiniEvents.VecType{$(length(actions)), Float64})
     ag_name = decl.args[1]
     ag_type = decl.args[2]
+	decl_str = string(decl)
 
 	debug_code = if debug 
 		quote 
 			crates = calc_rates(ag_actions.agent, $sim_name)
-			if rates != crates				
-				println(stderr, "rate mismatch detected: stored ($rates) != calculated ($crates)")
-				exit(1)
+			if rates != crates
+				error("rate mismatch detected for $($decl_str): stored ($rates) != calculated ($crates)")
 			end
 		end
 	else
